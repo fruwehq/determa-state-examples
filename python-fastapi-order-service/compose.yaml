@@ -1,0 +1,10 @@
+services:
+  order-service:
+    build: .
+    environment:
+      ORDER_DATABASE: /data/orders.sqlite3
+      ORDER_DEFINITION_VERSION: "2"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./var:/data

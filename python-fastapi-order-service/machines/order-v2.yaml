@@ -1,0 +1,139 @@
+format: 1
+namespace: examples.orders
+events:
+  payment_requested:
+    direction: output
+    payload:
+      order_id: { type: string, required: true }
+      amount_cents: { type: int, required: true }
+  payment_accepted:
+    direction: input
+    correlates_to: payment_requested
+  payment_rejected:
+    direction: input
+    correlates_to: payment_requested
+    payload:
+      reason: { type: string, required: true }
+  fulfillment_requested:
+    direction: output
+    payload:
+      order_id: { type: string, required: true }
+  fulfillment_started:
+    direction: input
+    correlates_to: fulfillment_requested
+  fulfillment_succeeded:
+    direction: input
+    correlates_to: fulfillment_requested
+  fulfillment_failed:
+    direction: input
+    correlates_to: fulfillment_requested
+    payload:
+      reason: { type: string, required: true }
+  fulfillment_cancellation_requested:
+    direction: output
+    payload:
+      order_id: { type: string, required: true }
+  fulfillment_cancelled:
+    direction: input
+    correlates_to: fulfillment_cancellation_requested
+  fulfillment_cancellation_failed:
+    direction: input
+    correlates_to: fulfillment_cancellation_requested
+    payload:
+      reason: { type: string, required: true }
+  cancel_requested:
+    direction: input
+machines:
+  - machine_id: order
+    version: 2
+    root:
+      type: composite
+      variables:
+        order_id: { type: string, input: true }
+        customer_id: { type: string, input: true }
+        amount_cents: { type: int, input: true }
+        order_status: { type: string, init: awaiting_payment }
+      initial: { transition_to: awaiting_payment }
+      states:
+        awaiting_payment:
+          entry:
+            - send:
+                event: payment_requested
+                to: { external: true }
+                payload:
+                  order_id: order_id
+                  amount_cents: amount_cents
+                correlation_id: order_id
+          on_events:
+            payment_accepted:
+              transition_to: awaiting_fulfillment
+              action:
+                - assign: { order_status: "'awaiting_fulfillment'" }
+            payment_rejected:
+              transition_to: payment_rejected
+              action:
+                - assign: { order_status: "'payment_rejected'" }
+            cancel_requested:
+              transition_to: cancelled
+              action:
+                - assign: { order_status: "'cancelled'" }
+        awaiting_fulfillment:
+          entry:
+            - send:
+                event: fulfillment_requested
+                to: { external: true }
+                payload:
+                  order_id: order_id
+                correlation_id: order_id
+          on_events:
+            fulfillment_started:
+              transition_to: shipping
+              action:
+                - assign: { order_status: "'shipping'" }
+            fulfillment_succeeded:
+              transition_to: completed
+              action:
+                - assign: { order_status: "'completed'" }
+            fulfillment_failed:
+              transition_to: failed
+              action:
+                - assign: { order_status: "'failed'" }
+            cancel_requested:
+              transition_to: cancellation_pending
+              action:
+                - assign: { order_status: "'cancellation_pending'" }
+        shipping:
+          on_events:
+            fulfillment_succeeded:
+              transition_to: completed
+              action:
+                - assign: { order_status: "'completed'" }
+            fulfillment_failed:
+              transition_to: failed
+              action:
+                - assign: { order_status: "'failed'" }
+            cancel_requested:
+              transition_to: cancellation_pending
+              action:
+                - assign: { order_status: "'cancellation_pending'" }
+        cancellation_pending:
+          entry:
+            - send:
+                event: fulfillment_cancellation_requested
+                to: { external: true }
+                payload:
+                  order_id: order_id
+                correlation_id: order_id
+          on_events:
+            fulfillment_cancelled:
+              transition_to: cancelled
+              action:
+                - assign: { order_status: "'cancelled'" }
+            fulfillment_cancellation_failed:
+              transition_to: failed
+              action:
+                - assign: { order_status: "'failed'" }
+        payment_rejected: { type: final }
+        completed: { type: final }
+        cancelled: { type: final }
+        failed: { type: final }
