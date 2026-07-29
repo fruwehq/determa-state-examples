@@ -1,0 +1,156 @@
+{
+  "mappings": {
+    "active_states": [
+      {
+        "source_leaf_state_definition_pointer": "/machines/0/root/states/awaiting_payment",
+        "target_leaf_state_definition_pointers": [
+          "/machines/0/root/states/awaiting_payment"
+        ]
+      },
+      {
+        "source_leaf_state_definition_pointer": "/machines/0/root/states/awaiting_fulfillment",
+        "target_leaf_state_definition_pointers": [
+          "/machines/0/root/states/awaiting_fulfillment"
+        ]
+      },
+      {
+        "source_leaf_state_definition_pointer": "/machines/0/root/states/fulfilling",
+        "target_leaf_state_definition_pointers": [
+          "/machines/0/root/states/shipping"
+        ]
+      },
+      {
+        "source_leaf_state_definition_pointer": "/machines/0/root/states/cancellation_pending",
+        "target_leaf_state_definition_pointers": [
+          "/machines/0/root/states/cancellation_pending"
+        ]
+      },
+      {
+        "source_leaf_state_definition_pointer": "/machines/0/root/states/payment_rejected",
+        "target_leaf_state_definition_pointers": [
+          "/machines/0/root/states/payment_rejected"
+        ]
+      },
+      {
+        "source_leaf_state_definition_pointer": "/machines/0/root/states/completed",
+        "target_leaf_state_definition_pointers": [
+          "/machines/0/root/states/completed"
+        ]
+      },
+      {
+        "source_leaf_state_definition_pointer": "/machines/0/root/states/cancelled",
+        "target_leaf_state_definition_pointers": [
+          "/machines/0/root/states/cancelled"
+        ]
+      },
+      {
+        "source_leaf_state_definition_pointer": "/machines/0/root/states/failed",
+        "target_leaf_state_definition_pointers": [
+          "/machines/0/root/states/failed"
+        ]
+      }
+    ],
+    "components": [],
+    "counters": [
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root",
+        "target_definition_pointer": "/machines/0/root"
+      },
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root/states/awaiting_payment",
+        "target_definition_pointer": "/machines/0/root/states/awaiting_payment"
+      },
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root/states/awaiting_fulfillment",
+        "target_definition_pointer": "/machines/0/root/states/awaiting_fulfillment"
+      },
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root/states/fulfilling",
+        "target_definition_pointer": "/machines/0/root/states/shipping"
+      },
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root/states/cancellation_pending",
+        "target_definition_pointer": "/machines/0/root/states/cancellation_pending"
+      },
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root/states/payment_rejected",
+        "target_definition_pointer": "/machines/0/root/states/payment_rejected"
+      },
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root/states/completed",
+        "target_definition_pointer": "/machines/0/root/states/completed"
+      },
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root/states/cancelled",
+        "target_definition_pointer": "/machines/0/root/states/cancelled"
+      },
+      {
+        "operation": "map",
+        "source_definition_pointer": "/machines/0/root/states/failed",
+        "target_definition_pointer": "/machines/0/root/states/failed"
+      }
+    ],
+    "history": [],
+    "lifetime_holders": [],
+    "machines": [
+      {
+        "source_definition_pointer": "/machines/0/root",
+        "target_definition_pointer": "/machines/0/root"
+      }
+    ],
+    "owned_runtimes": [],
+    "variables": [
+      {
+        "operation": "copy",
+        "source_declaration_pointer": "/machines/0/root/variables/order_id",
+        "target_declaration_pointer": "/machines/0/root/variables/order_id"
+      },
+      {
+        "operation": "copy",
+        "source_declaration_pointer": "/machines/0/root/variables/customer_id",
+        "target_declaration_pointer": "/machines/0/root/variables/customer_id"
+      },
+      {
+        "operation": "copy",
+        "source_declaration_pointer": "/machines/0/root/variables/amount_cents",
+        "target_declaration_pointer": "/machines/0/root/variables/amount_cents"
+      },
+      {
+        "operation": "transform",
+        "source_declaration_pointers": [
+          "/machines/0/root/variables/order_status"
+        ],
+        "target_declaration_pointer": "/machines/0/root/variables/order_status",
+        "expression": "source_0 == 'fulfilling' ? 'shipping' : source_0"
+      }
+    ]
+  },
+  "migration_descriptor_digest": "sha256:fb4707a5378a17fbabdb4b896342aa60cd59c76e12de799fe07eac67b283ff4b",
+  "migration_descriptor_format": "determa.aggregate_migration",
+  "migration_descriptor_schema_version": 1,
+  "mode": "transform",
+  "resource_requirements": {
+    "maximum_cel_ast_nodes": "41",
+    "maximum_cel_evaluation_steps": "41",
+    "maximum_cel_expression_length": "48",
+    "maximum_transformed_output_bytes": "23"
+  },
+  "source_aggregate_shape_fingerprint": "sha256:537195426bcda5921d2b20d8ca0ab52f3449789e6f66e6b3f40bb025d0130941",
+  "source_machine_format": 1,
+  "source_validated_bundle_fingerprint": "sha256:9ca0ee325f1d8c35c330d106b877d25619da79a974433e91985812b4477d0d4a",
+  "target_aggregate_shape_fingerprint": "sha256:5dc7bdb46a7c658fa37eb371421377c52cbe4ed9984af95f627a99ce0c4e22e6",
+  "target_machine_format": 1,
+  "target_validated_bundle_fingerprint": "sha256:098bb782d1e83c0ef52964f53e8c43dd4b7c5714d08af8eb5a00a12fe08c5208",
+  "terminal_policy": {
+    "completed": "preserve",
+    "faulted": "preserve"
+  }
+}

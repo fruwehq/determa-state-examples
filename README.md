@@ -5,9 +5,10 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
 
 ## Example catalog
 
-No application examples have been added yet. Each future entry will link to one
-self-contained top-level folder with its own dependencies, machine definitions,
-application code, tests, and operating instructions.
+- [Python FastAPI order service](python-fastapi-order-service/) - a direct-library
+  integration with a realistic payment and fulfillment lifecycle, transactional
+  SQLite inbox/aggregate/outbox persistence, restart recovery, idempotent effect
+  delivery, and lazy definition migration.
 
 The collection is intended to grow across languages, frameworks, and integration
 styles:
@@ -35,8 +36,3 @@ The beginner manual and tutorials live separately in
 teach Determa State through small projects that readers create step by step, including
 every command and edit. This repository instead contains complete applications that
 show realistic integration and operation.
-
-## Project status
-
-The repository contract is being established before the first example is selected
-and implemented.
