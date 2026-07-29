@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from order_service.api import create_app
 from order_service.settings import Settings
 
-from .conftest import create_order, send
+from .conftest import aggregate_order_status, create_order, send
 
 
 def app_client(database_path: Path, version: int) -> TestClient:
@@ -33,6 +33,8 @@ def test_restart_restores_canonical_aggregate(database_path: Path) -> None:
             "fulfillment-after-restart",
         )
         assert completed["active_state"] == "completed"
+        assert completed["lifecycle_status"] == "completed"
+        assert aggregate_order_status(database_path, order_id) == "completed"
 
 
 def test_next_command_lazily_migrates_and_remaps_active_state(
@@ -80,6 +82,8 @@ def test_maintenance_endpoint_explicitly_remaps_fulfilling_to_shipping(
         assert migrated["migration_applied"] is True
         assert migrated["machine_version"] == 2
         assert migrated["active_state"] == "shipping"
+        assert migrated["lifecycle_status"] == "shipping"
+        assert aggregate_order_status(database_path, order_id) == "shipping"
 
         repeated = new_deployment.post(f"/admin/orders/{order_id}/migrate").json()
         assert repeated["migration_applied"] is False

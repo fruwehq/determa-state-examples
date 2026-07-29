@@ -124,28 +124,31 @@
         "target_declaration_pointer": "/machines/0/root/variables/amount_cents"
       },
       {
-        "operation": "copy",
-        "source_declaration_pointer": "/machines/0/root/variables/order_status",
-        "target_declaration_pointer": "/machines/0/root/variables/order_status"
+        "operation": "transform",
+        "source_declaration_pointers": [
+          "/machines/0/root/variables/order_status"
+        ],
+        "target_declaration_pointer": "/machines/0/root/variables/order_status",
+        "expression": "source_0 == 'fulfilling' ? 'shipping' : source_0"
       }
     ]
   },
-  "migration_descriptor_digest": "sha256:7319fd65032cd7e82e4f83a3d7b53cd60061c5e3a90fef077a210eef6fe7c60e",
+  "migration_descriptor_digest": "sha256:fb4707a5378a17fbabdb4b896342aa60cd59c76e12de799fe07eac67b283ff4b",
   "migration_descriptor_format": "determa.aggregate_migration",
   "migration_descriptor_schema_version": 1,
   "mode": "transform",
   "resource_requirements": {
-    "maximum_cel_ast_nodes": "0",
-    "maximum_cel_evaluation_steps": "0",
-    "maximum_cel_expression_length": "0",
-    "maximum_transformed_output_bytes": "0"
+    "maximum_cel_ast_nodes": "41",
+    "maximum_cel_evaluation_steps": "41",
+    "maximum_cel_expression_length": "48",
+    "maximum_transformed_output_bytes": "23"
   },
-  "source_aggregate_shape_fingerprint": "sha256:ea790683a4d60a1bb47754eb97c53b4278f72c5050f50f1d030e04f28a1f33d4",
+  "source_aggregate_shape_fingerprint": "sha256:537195426bcda5921d2b20d8ca0ab52f3449789e6f66e6b3f40bb025d0130941",
   "source_machine_format": 1,
-  "source_validated_bundle_fingerprint": "sha256:dd0aca1b18e842b8582adf6790e2862ef41ab543c212d1f4bd943102349b687c",
-  "target_aggregate_shape_fingerprint": "sha256:99376b23ed110ca3417e0f605647ac4feadb12a54e54857f853385a5b30b035c",
+  "source_validated_bundle_fingerprint": "sha256:9ca0ee325f1d8c35c330d106b877d25619da79a974433e91985812b4477d0d4a",
+  "target_aggregate_shape_fingerprint": "sha256:5dc7bdb46a7c658fa37eb371421377c52cbe4ed9984af95f627a99ce0c4e22e6",
   "target_machine_format": 1,
-  "target_validated_bundle_fingerprint": "sha256:c13798c325bf8b2122191de25d21fdd284817cefd83aed268c91835635739b02",
+  "target_validated_bundle_fingerprint": "sha256:098bb782d1e83c0ef52964f53e8c43dd4b7c5714d08af8eb5a00a12fe08c5208",
   "terminal_policy": {
     "completed": "preserve",
     "faulted": "preserve"

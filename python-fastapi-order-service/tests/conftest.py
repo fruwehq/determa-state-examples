@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
 
+import determa.state as ds
 import pytest
 from fastapi.testclient import TestClient
 
 from order_service.api import create_app
+from order_service.definitions import DefinitionRegistry
 from order_service.settings import Settings
 
 
@@ -56,3 +59,16 @@ def send(
     )
     assert response.status_code == 200, response.text
     return cast(dict[str, object], response.json())
+
+
+def aggregate_order_status(database_path: Path, order_id: str) -> str:
+    with sqlite3.connect(database_path) as connection:
+        row = connection.execute(
+            "SELECT aggregate_bytes FROM orders WHERE order_id = ?", (order_id,)
+        ).fetchone()
+    assert row is not None
+    restored = ds.restore_aggregate(
+        bytes(row[0]), DefinitionRegistry.load().resolver
+    )
+    root = restored.state["runtimes"][restored.state["root_runtime_id"]]
+    return cast(str, root["scopes"]["root"]["order_status"])

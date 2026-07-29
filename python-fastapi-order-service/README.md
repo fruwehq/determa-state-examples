@@ -51,6 +51,11 @@ transaction and persists every output intent before any adapter can deliver it.
 `effect_id` is the adapter's idempotency key. SQLite protects local data atomically;
 external systems still need their own idempotency and retry policies.
 
+The four business-terminal states are inert simple leaves rather than Determa `final`
+states. Format 1 completion disposes the root variable scope; keeping these leaves
+active preserves the machine-owned `order_status` in the portable aggregate for
+durable inspection. Their lack of handlers makes later workflow events invalid.
+
 ## Prerequisites
 
 - Python 3.11 through 3.14
@@ -137,8 +142,16 @@ The final state is `completed`.
 Reject payment before it is accepted:
 
 ```sh
+REJECTED_ORDER_ID=$(
+  curl -sS -X POST http://127.0.0.1:8000/orders \
+    -H 'Content-Type: application/json' \
+    -H 'Idempotency-Key: create-rejected-order-1001' \
+    -d '{"customer_id":"customer-rejected","amount_cents":4900}' |
+    python -c 'import json,sys; print(json.load(sys.stdin)["order_id"])'
+)
+
 curl -sS -X POST \
-  "http://127.0.0.1:8000/orders/$ORDER_ID/events/payment_rejected" \
+  "http://127.0.0.1:8000/orders/$REJECTED_ORDER_ID/events/payment_rejected" \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: payment-rejected-1001' \
   -d '{"reason":"card declined"}'
@@ -147,8 +160,22 @@ curl -sS -X POST \
 After payment acceptance, a warehouse failure instead uses:
 
 ```sh
+FAILED_ORDER_ID=$(
+  curl -sS -X POST http://127.0.0.1:8000/orders \
+    -H 'Content-Type: application/json' \
+    -H 'Idempotency-Key: create-failed-order-1001' \
+    -d '{"customer_id":"customer-failed","amount_cents":8900}' |
+    python -c 'import json,sys; print(json.load(sys.stdin)["order_id"])'
+)
+
 curl -sS -X POST \
-  "http://127.0.0.1:8000/orders/$ORDER_ID/events/fulfillment_failed" \
+  "http://127.0.0.1:8000/orders/$FAILED_ORDER_ID/events/payment_accepted" \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: payment-accepted-failed-order-1001' \
+  -d '{}'
+
+curl -sS -X POST \
+  "http://127.0.0.1:8000/orders/$FAILED_ORDER_ID/events/fulfillment_failed" \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: fulfillment-failed-1001' \
   -d '{"reason":"warehouse unavailable"}'
@@ -166,10 +193,30 @@ After payment acceptance, submit `cancel_requested`. The machine enters
 `fulfillment_cancellation_failed` input moves it to `failed`.
 
 ```sh
+CANCELLED_ORDER_ID=$(
+  curl -sS -X POST http://127.0.0.1:8000/orders \
+    -H 'Content-Type: application/json' \
+    -H 'Idempotency-Key: create-cancelled-order-1001' \
+    -d '{"customer_id":"customer-cancelled","amount_cents":6900}' |
+    python -c 'import json,sys; print(json.load(sys.stdin)["order_id"])'
+)
+
 curl -sS -X POST \
-  "http://127.0.0.1:8000/orders/$ORDER_ID/events/cancel_requested" \
+  "http://127.0.0.1:8000/orders/$CANCELLED_ORDER_ID/events/payment_accepted" \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: payment-accepted-cancelled-order-1001' \
+  -d '{}'
+
+curl -sS -X POST \
+  "http://127.0.0.1:8000/orders/$CANCELLED_ORDER_ID/events/cancel_requested" \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: cancel-requested-1001' \
+  -d '{}'
+
+curl -sS -X POST \
+  "http://127.0.0.1:8000/orders/$CANCELLED_ORDER_ID/events/fulfillment_cancelled" \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: fulfillment-cancelled-1001' \
   -d '{}'
 ```
 

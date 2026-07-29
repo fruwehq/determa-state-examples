@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
-from .conftest import create_order, send
+from .conftest import aggregate_order_status, create_order, send
 
 
 def test_happy_path_persists_effects_and_requires_later_outcomes(
@@ -36,6 +38,7 @@ def test_happy_path_persists_effects_and_requires_later_outcomes(
 
 def test_payment_rejection_and_fulfillment_failure_are_terminal(
     client: TestClient,
+    database_path: Path,
 ) -> None:
     rejected = create_order(client, key="create-rejected")
     rejected_id = str(rejected["order_id"])
@@ -47,6 +50,8 @@ def test_payment_rejection_and_fulfillment_failure_are_terminal(
         reason="card declined",
     )
     assert outcome["active_state"] == "payment_rejected"
+    assert outcome["lifecycle_status"] == "payment_rejected"
+    assert aggregate_order_status(database_path, rejected_id) == "payment_rejected"
 
     failed = create_order(client, key="create-failed")
     failed_id = str(failed["order_id"])
@@ -59,9 +64,14 @@ def test_payment_rejection_and_fulfillment_failure_are_terminal(
         reason="warehouse unavailable",
     )
     assert outcome["active_state"] == "failed"
+    assert outcome["lifecycle_status"] == "failed"
+    assert aggregate_order_status(database_path, failed_id) == "failed"
 
 
-def test_cancellation_waits_for_external_confirmation(client: TestClient) -> None:
+def test_cancellation_waits_for_external_confirmation(
+    client: TestClient,
+    database_path: Path,
+) -> None:
     order = create_order(client, key="create-cancel")
     order_id = str(order["order_id"])
     send(client, order_id, "payment_accepted", "payment-accepted-cancel")
@@ -82,6 +92,8 @@ def test_cancellation_waits_for_external_confirmation(client: TestClient) -> Non
         "fulfillment-cancelled-1",
     )
     assert cancelled["active_state"] == "cancelled"
+    assert cancelled["lifecycle_status"] == "cancelled"
+    assert aggregate_order_status(database_path, order_id) == "cancelled"
 
 
 def test_duplicate_commands_do_not_repeat_state_changes_or_effects(

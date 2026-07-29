@@ -113,13 +113,6 @@ class OrderService:
             restored = ds.restore_aggregate(
                 bytes(row["aggregate_bytes"]), self.definitions.resolver
             )
-            current_machine = self.current_bundle.machine("order")
-            assert current_machine is not None
-            projected_status = self._project_status(
-                str(row["lifecycle_status"]),
-                event_name,
-                int(current_machine["version"]),
-            )
             target = {
                 "root": {
                     "root_instance_id": restored.state["root_instance_id"],
@@ -181,7 +174,6 @@ class OrderService:
                 restored_result.bundle,
                 restored_result.state,
                 aggregate,
-                lifecycle_status_hint=projected_status,
             )
             connection.execute(
                 """
@@ -234,7 +226,6 @@ class OrderService:
                     restored.bundle,
                     restored.state,
                     bytes(row["aggregate_bytes"]),
-                    lifecycle_status_hint=str(row["lifecycle_status"]),
                 )
                 return CommandResult(view, False, False)
             outcome = ds.migrate_aggregate(
@@ -257,7 +248,6 @@ class OrderService:
                 restored_result.bundle,
                 restored_result.state,
                 outcome.aggregate_bytes,
-                lifecycle_status_hint=str(row["lifecycle_status"]),
             )
             connection.execute(
                 """
@@ -302,7 +292,6 @@ class OrderService:
                 restored.bundle,
                 restored.state,
                 bytes(row["aggregate_bytes"]),
-                lifecycle_status_hint=str(row["lifecycle_status"]),
             )
 
     def list_outbox(self, order_id: str | None = None) -> list[dict[str, Any]]:
@@ -466,15 +455,9 @@ class OrderService:
         bundle: ds.Bundle,
         state: dict[str, Any],
         aggregate: bytes,
-        lifecycle_status_hint: str | None = None,
     ) -> dict[str, Any]:
         root = state["runtimes"][state["root_runtime_id"]]
-        active = list(root["active"])
-        active_state = (
-            str(active[-1])
-            if active
-            else lifecycle_status_hint or str(root["status"])
-        )
+        lifecycle_status = cast(str, root["scopes"]["root"]["order_status"])
         envelope = json.loads(aggregate)
         machine = bundle.machine("order")
         assert machine is not None
@@ -482,8 +465,8 @@ class OrderService:
             "order_id": order_id,
             "customer_id": customer_id,
             "amount_cents": amount_cents,
-            "lifecycle_status": active_state,
-            "active_state": active_state,
+            "lifecycle_status": lifecycle_status,
+            "active_state": lifecycle_status,
             "machine_version": int(machine["version"]),
             "definition_fingerprint": bundle.fingerprint,
             "aggregate_digest": envelope["aggregate_state_digest"],
@@ -504,25 +487,3 @@ class OrderService:
     @staticmethod
     def _json(value: Any) -> str:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-
-    @staticmethod
-    def _project_status(current: str, event: str, machine_version: int) -> str:
-        shipping = "fulfilling" if machine_version == 1 else "shipping"
-        transitions = {
-            ("awaiting_payment", "payment_accepted"): "awaiting_fulfillment",
-            ("awaiting_payment", "payment_rejected"): "payment_rejected",
-            ("awaiting_payment", "cancel_requested"): "cancelled",
-            ("awaiting_fulfillment", "fulfillment_started"): shipping,
-            ("awaiting_fulfillment", "fulfillment_succeeded"): "completed",
-            ("awaiting_fulfillment", "fulfillment_failed"): "failed",
-            ("awaiting_fulfillment", "cancel_requested"): "cancellation_pending",
-            ("fulfilling", "fulfillment_succeeded"): "completed",
-            ("fulfilling", "fulfillment_failed"): "failed",
-            ("fulfilling", "cancel_requested"): "cancellation_pending",
-            ("shipping", "fulfillment_succeeded"): "completed",
-            ("shipping", "fulfillment_failed"): "failed",
-            ("shipping", "cancel_requested"): "cancellation_pending",
-            ("cancellation_pending", "fulfillment_cancelled"): "cancelled",
-            ("cancellation_pending", "fulfillment_cancellation_failed"): "failed",
-        }
-        return transitions.get((current, event), current)
