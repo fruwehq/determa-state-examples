@@ -1,0 +1,12 @@
+services:
+  change-control:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - change-control-data:/data
+    environment:
+      RUST_LOG: info
+
+volumes:
+  change-control-data:

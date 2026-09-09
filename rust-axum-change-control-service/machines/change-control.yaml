@@ -1,0 +1,124 @@
+format: 1
+namespace: example.change_control
+
+events:
+  review_started:
+    direction: input
+    payload:
+      reviewer: { type: string, required: true }
+  change_approved:
+    direction: input
+    payload:
+      reviewer: { type: string, required: true }
+  change_rejected:
+    direction: input
+    payload:
+      reviewer: { type: string, required: true }
+      reason: { type: string, required: true }
+  deployment_requested:
+    direction: output
+    payload:
+      change_id: { type: string, required: true }
+      title: { type: string, required: true }
+  deployment_succeeded:
+    direction: input
+    correlates_to: deployment_requested
+    payload:
+      deployment_id: { type: string, required: true }
+  deployment_failed:
+    direction: input
+    correlates_to: deployment_requested
+    payload:
+      reason: { type: string, required: true }
+  rollback_requested:
+    direction: output
+    payload:
+      change_id: { type: string, required: true }
+      deployment_reason: { type: string, required: true }
+  rollback_succeeded:
+    direction: input
+    correlates_to: rollback_requested
+  rollback_failed:
+    direction: input
+    correlates_to: rollback_requested
+    payload:
+      reason: { type: string, required: true }
+
+machines:
+  - machine_id: change_control
+    version: 1
+    root:
+      type: composite
+      variables:
+        change_id: { type: string, input: true }
+        title: { type: string, input: true }
+        requester: { type: string, input: true }
+        lifecycle_status: { type: string, init: submitted }
+        reviewer: { type: string, init: "" }
+        rejection_reason: { type: string, init: "" }
+        deployment_id: { type: string, init: "" }
+        deployment_failure: { type: string, init: "" }
+        rollback_failure: { type: string, init: "" }
+      initial: { transition_to: submitted }
+      states:
+        submitted:
+          on_events:
+            review_started:
+              transition_to: under_review
+              action:
+                - assign: { reviewer: event.payload.reviewer }
+                - assign: { lifecycle_status: "'under_review'" }
+        under_review:
+          on_events:
+            change_approved:
+              transition_to: deploying
+              action:
+                - assign: { reviewer: event.payload.reviewer }
+                - assign: { lifecycle_status: "'deploying'" }
+                - send:
+                    event: deployment_requested
+                    to: { external: true }
+                    correlation_id: change_id
+                    payload:
+                      change_id: change_id
+                      title: title
+            change_rejected:
+              transition_to: rejected
+              action:
+                - assign: { reviewer: event.payload.reviewer }
+                - assign: { rejection_reason: event.payload.reason }
+                - assign: { lifecycle_status: "'rejected'" }
+        deploying:
+          on_events:
+            deployment_succeeded:
+              transition_to: deployed
+              action:
+                - assign: { deployment_id: event.payload.deployment_id }
+                - assign: { lifecycle_status: "'deployed'" }
+            deployment_failed:
+              transition_to: rollback_pending
+              action:
+                - assign: { deployment_failure: event.payload.reason }
+                - assign: { lifecycle_status: "'rollback_pending'" }
+                - send:
+                    event: rollback_requested
+                    to: { external: true }
+                    correlation_id: change_id
+                    payload:
+                      change_id: change_id
+                      deployment_reason: event.payload.reason
+        rollback_pending:
+          on_events:
+            rollback_succeeded:
+              transition_to: rolled_back
+              action:
+                - assign: { lifecycle_status: "'rolled_back'" }
+            rollback_failed:
+              transition_to: rollback_failed_terminal
+              action:
+                - assign: { rollback_failure: event.payload.reason }
+                - assign: { lifecycle_status: "'rollback_failed'" }
+        rejected: {}
+        deployed: {}
+        rolled_back: {}
+        rollback_failed_terminal: {}
