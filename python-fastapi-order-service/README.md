@@ -1,7 +1,7 @@
 # Python FastAPI order service
 
 A complete order workflow application that embeds the released
-`determa-state==0.1.0` Python library directly. It exposes an HTTP API, stores portable
+`determa-state==0.2.0` Python library directly. It exposes an HTTP API, stores portable
 Determa aggregates in SQLite, and treats payment and fulfillment calls as durable
 host-managed effects.
 
@@ -50,6 +50,14 @@ The Determa core is a pure foreground transform. `OrderService` owns the host
 transaction and persists every output intent before any adapter can deliver it.
 `effect_id` is the adapter's idempotency key. SQLite protects local data atomically;
 external systems still need their own idempotency and retry policies.
+
+This application intentionally calls the core library directly instead of using
+`ExecutionHost`. One application-owned SQLite transaction must cover the order row,
+inbox receipt, aggregate checkpoint, migration audit, and outbox intents. Keeping that
+boundary in `OrderService` lets the business data and Determa data commit or roll back
+together. `ExecutionHost` is useful when its store owns the execution transaction, but
+delegating to it here would split the transaction that this example is designed to
+demonstrate.
 
 The four business-terminal states are inert simple leaves rather than Determa `final`
 states. Format 1 completion disposes the root variable scope; keeping these leaves

@@ -26,9 +26,9 @@ click==8.4.2 \
     --hash=sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6 \
     --hash=sha256:e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76
     # via uvicorn
-determa-state==0.1.0 \
-    --hash=sha256:7adeda9877e1698262918ca36bf38ea420aa6ae7820abd442f5034cad9fbd5ab \
-    --hash=sha256:c1ddde17d4dadb9797d727fce75186cb3609d479c902098f12ddb49625bc7709
+determa-state==0.2.0 \
+    --hash=sha256:8aee5f6cac1086fd3731b39dc7f946eda0a56b30e6966384c7246588846b0e21 \
+    --hash=sha256:ecc6269dfb0938d09f887da6a874f26121329b528086302616ef6493ba64f1e7
     # via -r requirements.in
 fastapi==0.116.1 \
     --hash=sha256:c46ac7c312df840f0c9e220f7964bada936781bc4e2e6eb71f1c4d7553786565 \
