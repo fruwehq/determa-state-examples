@@ -5,7 +5,8 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
 
 ## Example catalog
 
-- [Python FastAPI order service](python-fastapi-order-service/) - a direct-library
+- [Python FastAPI order service](python-fastapi-order-service/) - a Determa State 0.2.0
+  direct-library
   integration with a realistic payment and fulfillment lifecycle, transactional
   SQLite inbox/aggregate/outbox persistence, restart recovery, idempotent effect
   delivery, and lazy definition migration.

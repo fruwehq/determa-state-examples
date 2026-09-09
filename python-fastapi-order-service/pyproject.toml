@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "determa-fastapi-order-service-example"
-version = "0.1.0"
+version = "0.2.0"
 description = "A durable FastAPI order workflow powered by Determa State"
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 license = { text = "MIT" }
 dependencies = [
-  "determa-state==0.1.0",
+  "determa-state==0.2.0",
   "fastapi==0.116.1",
   "uvicorn==0.35.0",
 ]
