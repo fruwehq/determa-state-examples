@@ -10,6 +10,10 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
   integration with a realistic payment and fulfillment lifecycle, transactional
   SQLite inbox/aggregate/outbox persistence, restart recovery, idempotent effect
   delivery, and lazy definition migration.
+- [Rust Axum change-control service](rust-axum-change-control-service/) - a Determa
+  State 0.2.0 `CheckpointHost` integration with durable SQLite checkpoints, stable
+  operation replay, optimistic concurrency, auditable deployment and rollback
+  intents, restart recovery, and terminal change outcomes.
 
 The collection is intended to grow across languages, frameworks, and integration
 styles:
