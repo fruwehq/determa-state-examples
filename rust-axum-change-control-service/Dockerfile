@@ -13,6 +13,7 @@ RUN useradd --create-home --uid 10001 app
 COPY --from=builder /app/target/release/determa-change-control /usr/local/bin/determa-change-control
 RUN mkdir -p /data && chown app:app /data
 USER app
+ENV CHANGE_CONTROL_ADDRESS=0.0.0.0:8080
 ENV CHANGE_CONTROL_DATABASE=/data/change-control.sqlite3
 EXPOSE 8080
 HEALTHCHECK --interval=5s --timeout=2s --start-period=10s --retries=12 CMD curl --fail http://127.0.0.1:8080/health || exit 1

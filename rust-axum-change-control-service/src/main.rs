@@ -3,6 +3,8 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
+const DEFAULT_ADDRESS: &str = "127.0.0.1:8080";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -14,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let state = open_state(&database)?;
     let address: SocketAddr = env::var("CHANGE_CONTROL_ADDRESS")
-        .unwrap_or_else(|_| "0.0.0.0:8080".into())
+        .unwrap_or_else(|_| DEFAULT_ADDRESS.into())
         .parse()?;
     let listener = TcpListener::bind(address).await?;
     tracing::info!(%address, database = %database.display(), "change-control service listening");
@@ -37,4 +39,17 @@ fn absolute_database_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
 
 async fn shutdown() {
     let _ = tokio::signal::ctrl_c().await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_address_is_loopback_only() {
+        let address: SocketAddr = DEFAULT_ADDRESS.parse().expect("valid default address");
+
+        assert!(address.ip().is_loopback());
+        assert_eq!(address.port(), 8080);
+    }
 }

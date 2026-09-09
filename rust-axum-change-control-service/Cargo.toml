@@ -12,7 +12,6 @@ determa-state = { version = "=0.2.0", default-features = false, features = ["sql
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
 tokio = { version = "1.47.1", features = ["macros", "net", "rt-multi-thread", "signal"] }
-tower-http = { version = "0.6.6", features = ["trace"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
