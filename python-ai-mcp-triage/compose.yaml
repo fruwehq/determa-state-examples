@@ -1,0 +1,9 @@
+services:
+  host:
+    build: .
+    ports: ["127.0.0.1:8090:8090"]
+    environment:
+      TRIAGE_TOKEN: "${TRIAGE_TOKEN:?set a local deployment token}"
+    volumes: ["triages:/data"]
+volumes:
+  triages: {}

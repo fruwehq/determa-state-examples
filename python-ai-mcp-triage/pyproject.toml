@@ -1,0 +1,13 @@
+[project]
+name = "determa-ai-mcp-triage-example"
+version = "0.3.0"
+requires-python = ">=3.11,<3.14"
+dependencies = ["determa-state @ git+https://github.com/fruwehq/determa-state-python.git@61fd77ed2e73365e80739d6d99c50c54fc6f0da6"]
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
