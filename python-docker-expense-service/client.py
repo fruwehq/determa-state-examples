@@ -110,6 +110,8 @@ class ExpenseClient:
             runtime = next(
                 r for r in aggregate["runtimes"] if r["runtime_id"] == aggregate["root_runtime_id"]
             )
+            if runtime["ready_mailbox"] or runtime["deferred_mailbox"]:
+                raise ValueError("resume outstanding mailbox work before a new command")
             envelope = ds.portable_envelope(
                 event, event_id, runtime["target_identity"], payload or {}
             )
@@ -167,6 +169,14 @@ class ExpenseClient:
         else:
             saved_process = saved[2]
         result = checked(command_client.submit("expenses", json.loads(saved_process)))
+        terminal = result.get("terminal_receipt")
+        expected_digest = candidate["arguments"]["ordered_deliveries"][0]["envelope_digest"]
+        if (
+            terminal is None
+            or terminal["event_id"] != event_id
+            or terminal["request_digest"] != expected_digest
+        ):
+            raise ValueError("processing receipt does not identify this command")
         if result["core_result"]["disposition"] != "handled":
             raise ValueError("event was not handled; inspect the committed step receipt")
         return result["checkpoint"]

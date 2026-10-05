@@ -110,3 +110,40 @@ def test_command_resumes_saved_phases_after_unknown_outcome(tmp_path, lost_opera
         assert restarted.event("resume", "submit", "resume-submit", {"amount_cents": 500}) == saved
         with pytest.raises(ValueError, match="different application command"):
             restarted.event("resume", "submit", "resume-submit", {"amount_cents": 999})
+
+
+@pytest.mark.parametrize("separate_journal", [False, True])
+def test_new_commands_cannot_process_an_unresolved_prior_event(tmp_path, separate_journal):
+    with running(tmp_path / "host.sqlite3") as endpoint:
+        transport = http_transport("development-test-token")
+        lose = True
+
+        def send(address, candidate):
+            nonlocal lose
+            assert address == endpoint
+            response = transport(address, candidate)
+            if candidate["operation"] == "admit" and lose:
+                lose = False
+                raise TimeoutError("lost committed admission")
+            return response
+
+        app = ExpenseClient(tmp_path / "client.sqlite3", endpoint, "ignored", transport=send)
+        app.create("interleave")
+        with pytest.raises(TimeoutError):
+            app.event("interleave", "submit", "pending-submit", {"amount_cents": 500})
+        before = app.read("interleave")
+        other = (
+            ExpenseClient(tmp_path / "other.sqlite3", endpoint, "development-test-token")
+            if separate_journal
+            else app
+        )
+        with pytest.raises(ValueError, match="outstanding mailbox"):
+            other.event("interleave", "approve", "early-approve")
+        assert app.read("interleave") == before
+        assert values(app.event("interleave", "submit", "pending-submit", {"amount_cents": 500}))[
+            "decision"
+        ] == ["string", "pending"]
+        assert values(other.event("interleave", "approve", "later-approve"))["decision"] == [
+            "string",
+            "approved",
+        ]

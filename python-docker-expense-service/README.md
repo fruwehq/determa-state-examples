@@ -24,7 +24,11 @@ Tokens authenticate the HTTP adapter and never enter portable machine values.
 The Compose port is bound to loopback. Configure TLS and your own authentication
 policy before exposing an adapter outside this local environment.
 
-The machine owns draft, pending, approved and rejected states. SQLite commits
+The machine owns draft, pending, approved and rejected states. The application
+allows one outstanding mailbox command at a time, including across client journals;
+resume queued work before submitting another command. The processing terminal
+receipt must identify the exact event and envelope digest before the app reports
+success. Checkpoint CAS rejects races between new admissions. SQLite commits
 mailbox acceptance separately from processing, with checkpoint revision/digest
 preconditions. The host atomically saves the checkpoint and complete first public
 response. The client durably saves request bytes, endpoint and scope binding
@@ -65,3 +69,7 @@ of editing database rows. Regenerate the hashed lockfile with pip-tools after
 changing third-party dependencies; update both source pins and rerun checks after
 an engine update. This local example does not provide a distributed coordinator,
 remote database transaction, automatic retry service or managed control plane.
+
+Run `make container-check` for a real Docker workflow, exact receipt replay and
+native volume restart. An optional BuildKit `extra_ca` secret supports combined
+corporate CA trust without disabling TLS verification.

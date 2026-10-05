@@ -15,3 +15,6 @@ inspect:
 reset:
 	docker compose down -v
 	rm -f var/*.sqlite3 var/*.sqlite3-shm var/*.sqlite3-wal
+
+container-check:
+	.venv/bin/python scripts/container-e2e.py
