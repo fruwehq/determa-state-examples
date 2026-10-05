@@ -11,6 +11,7 @@ Python 3.11–3.13, Git, Make and Docker Compose are required. From this folder:
 ```sh
 make install
 make check
+make container-check
 export DOCUMENT_TOKEN=local-development-example-token
 make start
 .venv/bin/python client.py create document-42

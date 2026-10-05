@@ -119,3 +119,17 @@ def test_worker_cannot_rebind_retained_destination(tmp_path):
         other = DocumentClient(tmp_path / "other.sqlite3", "unavailable-local-endpoint", "ignored")
         with pytest.raises(ValueError, match="cannot change"):
             DocumentWorker(path, other)
+
+
+def test_mutated_destination_refused_before_transport_or_builder(tmp_path):
+    calls = []
+    app = DocumentClient(
+        tmp_path / "client.sqlite3", "original-endpoint", "ignored",
+        transport=lambda *args: calls.append(args),
+    )
+    worker = DocumentWorker(tmp_path / "worker.sqlite3", app,
+                            builder=lambda _: pytest.fail("work redirected"))
+    app.endpoint = "replacement-endpoint"
+    with pytest.raises(ValueError, match="cannot change"):
+        worker.drain("document-42")
+    assert calls == []

@@ -53,6 +53,11 @@ class DocumentWorker:
         return stream.getvalue()
 
     def drain(self, identity):
+        with self.connect() as connection:
+            if connection.execute("SELECT endpoint FROM destination").fetchall() != [
+                (self.app.endpoint,)
+            ]:
+                raise ValueError("worker destination cannot change for retained work")
         checkpoint = self.app.read(identity)
         completed = 0
         for item in checkpoint["pending_outbox_intents"]:

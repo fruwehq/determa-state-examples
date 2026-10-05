@@ -1,4 +1,4 @@
-"""Expense application client: no local copy of remotely committed machine state."""
+"""Document application client: no local copy of remotely committed machine state."""
 
 from __future__ import annotations
 
