@@ -1,6 +1,11 @@
 PYTHON ?= python3
 
-.PHONY: test provider reset
+.PHONY: setup test provider reset
+
+setup:
+	$(PYTHON) -m pip install --require-hashes -r requirements.lock.txt
+	$(PYTHON) scripts/install_candidate.py
+	$(PYTHON) -m pip install --no-build-isolation --no-deps .
 
 test:
 	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -v

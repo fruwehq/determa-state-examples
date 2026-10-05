@@ -4,8 +4,9 @@ This application is being completed for unreleased Determa State 0.3.0 under
 [scope issue23](https://github.com/fruwehq/determa-state-examples/issues/23).
 The current checkpoint implements the independently running durable fake destination
 and its foreground process bridge.
-The Determa host, desired/observed machine, authenticated native handler, timer,
-reconciliation and relocation integrations are still unfinished. Do not use this
+It also includes the `format: 1` desired/observed resource machine and its pure State tests.
+The durable State host, authenticated native handler, timer, provider reconciliation
+and relocation integrations are still unfinished. Do not use this
 checkpoint as a full lifecycle, recovery or publication acceptance certificate.
 
 The destination owns `data/provider.sqlite`, separate from the future host database.
@@ -19,13 +20,17 @@ original request and response; an absent receipt is `unknown`, never host rollba
 
 ## Run from this folder
 
-Python3.11 or later and its standard library are sufficient for this provider checkpoint.
-No root or sibling files are needed. Full application source/dependency locks will be
-added with the reviewed engine integration.
+Python3.11 or later and Git are required. No root or sibling files are needed.
+`requirements.lock.txt` pins the complete hashed dependency closure. `source-lock.json`
+pins the exact public unreleased State commit; setup verifies its repository, clean
+checkout, exact head and version before installing it. No release tag or registry
+publication is used to satisfy candidate installation.
 
 ```sh
-make test
-make provider
+python3 -m venv .venv
+make PYTHON=.venv/bin/python setup
+make PYTHON=.venv/bin/python test
+make PYTHON=.venv/bin/python provider
 ```
 
 At the provider prompt, submit:
@@ -86,3 +91,26 @@ for the pending verified State handler, not a completed native-effect profile.
 The bridge tests call a real child process, restart against retained native evidence,
 reject changed requests and unauthorized scopes, and exercise SIGKILL and SIGSTOP
 followed by a transport timeout. The host admission/recovery decisions remain pending.
+
+## Desired and observed resource model
+
+`src/infrastructure_lifecycle/machine.yaml` models one `server-1` resource. Desired
+presence/size, observed presence/size/revision, and the original outstanding request
+are separate variables. `set_desired` changes only desired state. Explicit `reconcile`
+emits an external request and pins that desired snapshot and business operation token.
+Later desired changes cannot rewrite an outstanding provider request. A matching
+`resource_applied` updates observed state from the original request, leaving any newer
+desired state for the next explicit reconciliation. Stale tokens or changed original
+request values cannot update observed state.
+
+An unknown provider result retains pending work in `uncertain`; another `reconcile`
+cannot start work there. Native acceptance evidence must be reconciled by the pending
+host integration. Domain rejection preserves observed state and needs explicit new
+work. A converged known resource emits nothing. The model tests exercise actual State
+creation, admission and stepping, including desired changes during work, stale results,
+uncertainty, removal and convergence. They do not persist a host or dispatch its emitted intent.
+
+Business-token checks express workflow consistency; they do not authenticate a worker,
+scope or provider. The future durable host must authenticate and verify native evidence
+before admitting these inputs. Full host-owned checkpoint/journal transactions,
+outcome/admission recovery, timers and relocation remain acceptance requirements.

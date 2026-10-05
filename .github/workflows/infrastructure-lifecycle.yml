@@ -12,7 +12,7 @@ on:
 permissions:
   contents: read
 jobs:
-  provider-checkpoint:
+  application-checkpoint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -25,4 +25,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '${{ matrix.python }}'
+      - run: make setup
       - run: make test
