@@ -5,6 +5,10 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
 
 ## Example catalog
 
+- [Embedded Python Cloud Tasks workflow](python-cloud-tasks-workflow/) - an unreleased
+  0.3.0 workflow with committed intents, real SDK/protobuf objects inside a native
+  handler, declared results, immutable destinations and offline transport tests.
+
 - [Python FastAPI order service](python-fastapi-order-service/) - a unreleased Determa State 0.3.0
   direct-library
   integration with a realistic payment and fulfillment lifecycle, transactional

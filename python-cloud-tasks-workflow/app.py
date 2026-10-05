@@ -212,6 +212,8 @@ class Workflow:
 
     def inspect(self) -> list[dict[str, Any]]:
         with self.connect() as connection:
+            for (raw,) in connection.execute("SELECT aggregate FROM workflows"):
+                ds.restore_aggregate_v1(bytes(raw), self.resolver)
             return [
                 {"workflow_id": identity, "aggregate": json.loads(raw)}
                 for identity, raw in connection.execute(
