@@ -48,7 +48,7 @@ def main():
                 )
                 for _ in range(30):
                     try:
-                        assert app.client.discover("triages")["status"] == "committed"
+                        assert app.client.discover("triage")["status"] == "committed"
                         return
                     except (URLError, ConnectionResetError, TimeoutError):
                         time.sleep(1)
