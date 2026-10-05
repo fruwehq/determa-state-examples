@@ -19,6 +19,7 @@ Python 3.11–3.13, Git, Make and Docker Compose are required. In this folder:
 ```sh
 make install
 make check
+make container-check
 export TRIAGE_TOKEN=local-development-example-token
 make start
 .venv/bin/python client.py create ticket-42
