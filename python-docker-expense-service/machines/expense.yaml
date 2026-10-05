@@ -1,0 +1,39 @@
+format: 1
+namespace: examples.remote_expense
+events:
+  submit:
+    direction: input
+    payload:
+      amount_cents: {type: int, required: true}
+  approve: {direction: input}
+  reject: {direction: input}
+machines:
+  - machine_id: expense
+    version: 1
+    root:
+      type: composite
+      variables:
+        amount_cents: {type: int, init: 0}
+        decision: {type: string, init: draft}
+      initial: {transition_to: draft}
+      states:
+        draft:
+          on_events:
+            submit:
+              guard: event.payload.amount_cents > 0
+              transition_to: pending
+              action:
+                - assign: {amount_cents: event.payload.amount_cents}
+                - assign: {decision: "'pending'"}
+        pending:
+          on_events:
+            approve:
+              transition_to: approved
+              action:
+                - assign: {decision: "'approved'"}
+            reject:
+              transition_to: rejected
+              action:
+                - assign: {decision: "'rejected'"}
+        approved: {}
+        rejected: {}

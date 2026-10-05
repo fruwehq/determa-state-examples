@@ -8,6 +8,9 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
 - [Embedded Python Cloud Tasks workflow](python-cloud-tasks-workflow/) - an unreleased
   0.3.0 workflow with committed intents, real SDK/protobuf objects inside a native
   handler, declared results, immutable destinations and offline transport tests.
+- [Docker-hosted expense approval](python-docker-expense-service/) - a public v1
+  HTTP client/SQLite host workflow with durable command phases, authenticated
+  routing, exact receipt retry and independent client/host persistence.
 
 - [Python FastAPI order service](python-fastapi-order-service/) - a unreleased Determa State 0.3.0
   direct-library
