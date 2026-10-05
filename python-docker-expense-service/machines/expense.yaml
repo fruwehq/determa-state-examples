@@ -23,7 +23,8 @@ machines:
               guard: event.payload.amount_cents > 0
               transition_to: pending
               action:
-                - assign: {amount_cents: event.payload.amount_cents, decision: "'pending'"}
+                - assign: {amount_cents: event.payload.amount_cents}
+                - assign: {decision: "'pending'"}
         pending:
           on_events:
             approve:

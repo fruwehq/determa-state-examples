@@ -56,10 +56,13 @@ def checked(response):
 class ExpenseClient:
     def __init__(self, journal: Path, endpoint: str, token: str, transport=None):
         journal.parent.mkdir(parents=True, exist_ok=True)
+        self.journal = journal
+        self.endpoint = endpoint
+        self.transport = transport or http_transport(token)
         self.client = PublicHostClient(
             journal,
             {"expenses": EndpointBinding(endpoint, "expenses")},
-            transport or http_transport(token),
+            self.transport,
         )
         self.client.setup_schema()
         self.command_path = journal.with_name(journal.stem + "-commands.sqlite3")
@@ -67,7 +70,7 @@ class ExpenseClient:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS commands "
                 "(event_id TEXT PRIMARY KEY, command BLOB NOT NULL, "
-                "admit BLOB NOT NULL, process BLOB)"
+                "endpoint TEXT NOT NULL, admit BLOB NOT NULL, process BLOB)"
             )
 
     def command_connection(self):
@@ -97,7 +100,7 @@ class ExpenseClient:
         command = canonical_bytes({"identity": identity, "event": event, "payload": payload or {}})
         with self.command_connection() as connection:
             saved = connection.execute(
-                "SELECT command,admit,process FROM commands WHERE event_id=?", (event_id,)
+                "SELECT command,admit,process,endpoint FROM commands WHERE event_id=?", (event_id,)
             ).fetchone()
         if saved is not None and saved[0] != command:
             raise ValueError("event ID reused for a different application command")
@@ -126,16 +129,20 @@ class ExpenseClient:
             }
             with self.command_connection() as connection:
                 connection.execute(
-                    "INSERT OR IGNORE INTO commands VALUES (?,?,?,NULL)",
-                    (event_id, command, canonical_bytes(candidate)),
+                    "INSERT OR IGNORE INTO commands VALUES (?,?,?,?,NULL)",
+                    (event_id, command, self.endpoint, canonical_bytes(candidate)),
                 )
                 saved = connection.execute(
-                    "SELECT command,admit,process FROM commands WHERE event_id=?", (event_id,)
+                    "SELECT command,admit,process,endpoint FROM commands WHERE event_id=?",
+                    (event_id,),
                 ).fetchone()
                 if saved[0] != command:
                     raise ValueError("event ID reused for a different application command")
+        command_client = PublicHostClient(
+            self.journal, {"expenses": EndpointBinding(saved[3], "expenses")}, self.transport
+        )
         candidate = json.loads(saved[1])
-        admitted = checked(self.client.submit("expenses", candidate))["checkpoint"]
+        admitted = checked(command_client.submit("expenses", candidate))["checkpoint"]
         if saved[2] is None:
             aggregate = admitted["root_record"]["aggregate_state"]
             runtime = next(
@@ -159,7 +166,7 @@ class ExpenseClient:
                 ).fetchone()[0]
         else:
             saved_process = saved[2]
-        result = checked(self.client.submit("expenses", json.loads(saved_process)))
+        result = checked(command_client.submit("expenses", json.loads(saved_process)))
         if result["core_result"]["disposition"] != "handled":
             raise ValueError("event was not handled; inspect the committed step receipt")
         return result["checkpoint"]

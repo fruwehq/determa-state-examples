@@ -54,6 +54,7 @@ def test_lost_http_response_reconciles_at_original_binding_after_client_restart(
 
         def send(address, candidate):
             nonlocal lost
+            assert address == endpoint
             response = transport(address, candidate)
             if candidate["operation"] == "create" and lost:
                 lost = False
@@ -64,7 +65,7 @@ def test_lost_http_response_reconciles_at_original_binding_after_client_restart(
         with pytest.raises(TimeoutError):
             app.create("lost-expense")
         restarted = ExpenseClient(
-            tmp_path / "client.sqlite3", "http://unavailable.invalid", "ignored", transport=send
+            tmp_path / "client.sqlite3", "unavailable-local-endpoint", "ignored", transport=send
         )
         observed = restarted.client.receipt("lost-expense:create")
         assert observed["value"]["result"]["retention"] == "retained"
@@ -81,3 +82,31 @@ def test_authentication_rejects_before_revealing_existence(tmp_path):
             with pytest.raises(HTTPError) as error:
                 send(endpoint, request("read", identity))
             assert error.value.code == 401
+
+
+@pytest.mark.parametrize("lost_operation", ["admit", "process"])
+def test_command_resumes_saved_phases_after_unknown_outcome(tmp_path, lost_operation):
+    with running(tmp_path / "host.sqlite3") as endpoint:
+        transport = http_transport("development-test-token")
+        lose = True
+
+        def send(address, candidate):
+            nonlocal lose
+            assert address == endpoint
+            response = transport(address, candidate)
+            if candidate["operation"] == lost_operation and lose:
+                lose = False
+                raise TimeoutError("lost committed phase response")
+            return response
+
+        journal = tmp_path / "client.sqlite3"
+        app = ExpenseClient(journal, endpoint, "ignored", transport=send)
+        app.create("resume")
+        with pytest.raises(TimeoutError):
+            app.event("resume", "submit", "resume-submit", {"amount_cents": 500})
+        restarted = ExpenseClient(journal, "unavailable-local-endpoint", "ignored", transport=send)
+        saved = restarted.event("resume", "submit", "resume-submit", {"amount_cents": 500})
+        assert values(saved)["decision"] == ["string", "pending"]
+        assert restarted.event("resume", "submit", "resume-submit", {"amount_cents": 500}) == saved
+        with pytest.raises(ValueError, match="different application command"):
+            restarted.event("resume", "submit", "resume-submit", {"amount_cents": 999})
