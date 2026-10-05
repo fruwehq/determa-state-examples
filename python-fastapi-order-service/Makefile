@@ -3,6 +3,7 @@
 install:
 	python -m venv .venv
 	.venv/bin/python -m pip install --require-hashes -r requirements-dev.lock.txt
+	.venv/bin/python scripts/install_candidate.py
 	.venv/bin/python -m pip install --no-build-isolation --no-deps .
 
 check:
