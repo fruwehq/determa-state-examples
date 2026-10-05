@@ -1,0 +1,195 @@
+"""Expense application client: no local copy of remotely committed machine state."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sqlite3
+import urllib.request
+import uuid
+from pathlib import Path
+
+import determa.state as ds
+from determa.state.public_client import EndpointBinding, PublicHostClient
+from determa.state.wire import canonical_bytes, strict_json
+
+ROOT = Path(__file__).resolve().parent
+
+
+def http_transport(token):
+    def send(endpoint, request):
+        outgoing = urllib.request.Request(
+            endpoint,
+            data=canonical_bytes(request),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + token,
+            },
+        )
+        with urllib.request.urlopen(outgoing, timeout=10) as response:
+            document, _ = strict_json(response.read())
+            return document
+
+    return send
+
+
+def request(operation, identity, operation_id=None):
+    return {
+        "protocol": "determa.execution_host",
+        "protocol_version": 1,
+        "scope_binding_identity": None,
+        "operation": operation,
+        "operation_id": operation_id or str(uuid.uuid4()),
+        "target": {"root_instance_id": identity, "runtime_id": None, "runtime_incarnation": None},
+        "precondition": None,
+        "arguments": {},
+    }
+
+
+def checked(response):
+    if response["status"] != "committed":
+        raise ValueError(f"public operation refused: {response['error']}")
+    return response["value"]["result"]
+
+
+class ExpenseClient:
+    def __init__(self, journal: Path, endpoint: str, token: str, transport=None):
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        self.client = PublicHostClient(
+            journal,
+            {"expenses": EndpointBinding(endpoint, "expenses")},
+            transport or http_transport(token),
+        )
+        self.client.setup_schema()
+        self.command_path = journal.with_name(journal.stem + "-commands.sqlite3")
+        with self.command_connection() as connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS commands "
+                "(event_id TEXT PRIMARY KEY, command BLOB NOT NULL, "
+                "admit BLOB NOT NULL, process BLOB)"
+            )
+
+    def command_connection(self):
+        connection = sqlite3.connect(self.command_path)
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA synchronous=FULL")
+        return connection
+
+    def create(self, identity):
+        bundle = ds.load_bundle((ROOT / "machines/expense.yaml").read_text())
+        candidate = request("create", identity, f"{identity}:create")
+        candidate["arguments"] = {
+            "validated_bundle_fingerprint": bundle.fingerprint,
+            "namespace": "examples.remote_expense",
+            "machine_id": "expense",
+            "machine_version": "1",
+            "root_instance_id": identity,
+            "creation_id": f"{identity}:create",
+            "bindings": ["map", []],
+        }
+        return checked(self.client.submit("expenses", candidate))["checkpoint"]
+
+    def read(self, identity):
+        return checked(self.client.submit("expenses", request("read", identity)))["checkpoint"]
+
+    def event(self, identity, event, event_id, payload=None):
+        command = canonical_bytes({"identity": identity, "event": event, "payload": payload or {}})
+        with self.command_connection() as connection:
+            saved = connection.execute(
+                "SELECT command,admit,process FROM commands WHERE event_id=?", (event_id,)
+            ).fetchone()
+        if saved is not None and saved[0] != command:
+            raise ValueError("event ID reused for a different application command")
+        if saved is None:
+            checkpoint = self.read(identity)
+            aggregate = checkpoint["root_record"]["aggregate_state"]
+            runtime = next(
+                r for r in aggregate["runtimes"] if r["runtime_id"] == aggregate["root_runtime_id"]
+            )
+            envelope = ds.portable_envelope(
+                event, event_id, runtime["target_identity"], payload or {}
+            )
+            candidate = request("admit", identity, f"{event_id}:admit")
+            candidate["precondition"] = {
+                "revision": checkpoint["revision"],
+                "checkpoint_digest": checkpoint["execution_checkpoint_digest"],
+            }
+            candidate["arguments"] = {
+                "ordered_deliveries": [
+                    {
+                        "delivery_mode": "input",
+                        "envelope": envelope,
+                        "envelope_digest": ds.delivery_request_digest(identity, "input", envelope),
+                    }
+                ]
+            }
+            with self.command_connection() as connection:
+                connection.execute(
+                    "INSERT OR IGNORE INTO commands VALUES (?,?,?,NULL)",
+                    (event_id, command, canonical_bytes(candidate)),
+                )
+                saved = connection.execute(
+                    "SELECT command,admit,process FROM commands WHERE event_id=?", (event_id,)
+                ).fetchone()
+                if saved[0] != command:
+                    raise ValueError("event ID reused for a different application command")
+        candidate = json.loads(saved[1])
+        admitted = checked(self.client.submit("expenses", candidate))["checkpoint"]
+        if saved[2] is None:
+            aggregate = admitted["root_record"]["aggregate_state"]
+            runtime = next(
+                r for r in aggregate["runtimes"] if r["runtime_id"] == aggregate["root_runtime_id"]
+            )
+            process = request("process", identity, f"{event_id}:process")
+            process["target"].update(
+                runtime_id=runtime["runtime_id"], runtime_incarnation=runtime["identity_origin"]
+            )
+            process["precondition"] = {
+                "revision": admitted["revision"],
+                "checkpoint_digest": admitted["execution_checkpoint_digest"],
+            }
+            with self.command_connection() as connection:
+                connection.execute(
+                    "UPDATE commands SET process=? WHERE event_id=? AND process IS NULL",
+                    (canonical_bytes(process), event_id),
+                )
+                saved_process = connection.execute(
+                    "SELECT process FROM commands WHERE event_id=?", (event_id,)
+                ).fetchone()[0]
+        else:
+            saved_process = saved[2]
+        result = checked(self.client.submit("expenses", json.loads(saved_process)))
+        if result["core_result"]["disposition"] != "handled":
+            raise ValueError("event was not handled; inspect the committed step receipt")
+        return result["checkpoint"]
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "command", choices=["create", "submit", "approve", "reject", "read", "retry", "receipt"]
+    )
+    parser.add_argument("identity", help="expense ID, or saved operation ID for retry/receipt")
+    parser.add_argument("--event-id", help="stable ID required for a new workflow command")
+    parser.add_argument("--amount-cents", type=int, default=12900)
+    parser.add_argument("--endpoint", default="http://127.0.0.1:8088/v1/operations")
+    parser.add_argument("--journal", type=Path, default=ROOT / "var/client.sqlite3")
+    args = parser.parse_args()
+    app = ExpenseClient(args.journal, args.endpoint, os.environ["EXPENSE_TOKEN"])
+    if args.command == "create":
+        result = app.create(args.identity)
+    elif args.command == "read":
+        result = app.read(args.identity)
+    elif args.command in {"retry", "receipt"}:
+        result = getattr(app.client, args.command)(args.identity)
+    else:
+        if not args.event_id:
+            parser.error("--event-id is required; preserve it across retries")
+        payload = {"amount_cents": args.amount_cents} if args.command == "submit" else {}
+        result = app.event(args.identity, args.command, args.event_id, payload)
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()

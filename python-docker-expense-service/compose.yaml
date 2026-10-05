@@ -1,0 +1,9 @@
+services:
+  host:
+    build: .
+    ports: ["127.0.0.1:8088:8088"]
+    environment:
+      EXPENSE_TOKEN: "${EXPENSE_TOKEN:?set a local deployment token}"
+    volumes: ["expenses:/data"]
+volumes:
+  expenses: {}
