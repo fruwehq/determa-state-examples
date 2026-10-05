@@ -8,6 +8,10 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
 - [Embedded Python Cloud Tasks workflow](python-cloud-tasks-workflow/) - an unreleased
   0.3.0 workflow with committed intents, real SDK/protobuf objects inside a native
   handler, declared results, immutable destinations and offline transport tests.
+- [No-code MCP document workflow](python-mcp-document-workflow/) - official MCP
+  stdio tools, remote public-host execution and an application-managed reference
+  connector with durable declared results.
+
 - [Customer-native document worker](python-remote-document-worker/) - remote public
   v1 machine execution with customer-owned native archives, durable local outcomes
   and correlated result events.
