@@ -2,7 +2,8 @@
 
 This application is being completed for unreleased Determa State 0.3.0 under
 [scope issue23](https://github.com/fruwehq/determa-state-examples/issues/23).
-The current checkpoint implements the independently running durable fake destination.
+The current checkpoint implements the independently running durable fake destination
+and its foreground process bridge.
 The Determa host, desired/observed machine, authenticated native handler, timer,
 reconciliation and relocation integrations are still unfinished. Do not use this
 checkpoint as a full lifecycle, recovery or publication acceptance certificate.
@@ -64,3 +65,24 @@ inspect native receipts and verify resource/receipt atomicity and equal replay.
 They also test the real stdin/stdout protocol, revision/content conflicts, authorized
 scope checks, immutable evidence and corruption refusals. These destination tests do
 not establish host transaction fate, authorized retry, or the later full crash matrix.
+
+## Foreground process bridge
+
+`infrastructure_lifecycle.client.ProviderProcess` starts the separately running
+destination with a configured scope and database path. Calls are serialized across
+the JSONL boundary. Scope authorization happens before transport; response size and
+elapsed time are bounded. `inspect(effect_id)` reads the destination's retained
+original request/response. `verify_retained(request, response)` independently queries
+that evidence and compares both exact values; equal caller-supplied strings alone
+are insufficient.
+
+A stopped or disconnected process raises `ProviderTransportError("delivery_ambiguous")`
+and closes that bridge. It never retries the request, starts a replacement destination,
+or resets deduplication history. A newly opened bridge can inspect the same durable
+destination. An `unknown` observation still does not prove that a host transaction
+rolled back or authorize a new attempt. These APIs are application-owned preparation
+for the pending verified State handler, not a completed native-effect profile.
+
+The bridge tests call a real child process, restart against retained native evidence,
+reject changed requests and unauthorized scopes, and exercise SIGKILL and SIGSTOP
+followed by a transport timeout. The host admission/recovery decisions remain pending.
