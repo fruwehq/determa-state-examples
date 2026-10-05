@@ -19,12 +19,18 @@ def docker(*arguments):
 
 
 def main():
+    # Validation never contacts a live model, even after a live deployment demo.
+    os.environ["TRIAGE_LIVE_MODEL"] = "0"
     image = "determa-triage-service:e2e"
     identity = f"determa-triage-e2e-{os.getpid()}"
     port = os.environ.get("TRIAGE_E2E_PORT", "18090")
     endpoint = f"http://127.0.0.1:{port}/v1/operations"
     if os.environ.get("EXAMPLE_PREBUILT_IMAGE") != "1":
-        subprocess.run(["docker", "analyze", "-t", image, str(ROOT)], check=True)
+        build = ["docker", "build"]
+        extra_ca = os.environ.get("EXAMPLE_EXTRA_CA")
+        if extra_ca:
+            build.extend(["--secret", f"id=extra_ca,src={extra_ca}"])
+        subprocess.run([*build, "-t", image, str(ROOT)], check=True)
     docker("volume", "create", identity)
     try:
         with tempfile.TemporaryDirectory() as temporary:
