@@ -8,6 +8,10 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
 - [Embedded Python Cloud Tasks workflow](python-cloud-tasks-workflow/) - an unreleased
   0.3.0 workflow with committed intents, real SDK/protobuf objects inside a native
   handler, declared results, immutable destinations and offline transport tests.
+- [AI triage through MCP](python-ai-mcp-triage/) - remote workflow execution,
+  native model SDK behind an actual MCP tool and durably reported declared results;
+  explicit offline provider fixture by default.
+
 - [No-code MCP document workflow](python-mcp-document-workflow/) - official MCP
   stdio tools, remote public-host execution and an application-managed reference
   connector with durable declared results.

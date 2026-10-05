@@ -1,0 +1,46 @@
+format: 1
+namespace: examples.ai_triage
+events:
+  analyze:
+    direction: input
+    payload:
+      text: {type: string, required: true}
+      request_id: {type: string, required: true}
+  analysis_requested:
+    direction: output
+    payload:
+      text: {type: string, required: true}
+  analysis_ready:
+    direction: input
+    correlates_to: analysis_requested
+    payload:
+      category: {type: string, required: true}
+      summary: {type: string, required: true}
+machines:
+  - machine_id: triage
+    version: 1
+    root:
+      type: composite
+      variables:
+        category: {type: string, init: ""}
+        summary: {type: string, init: ""}
+      initial: {transition_to: ready}
+      states:
+        ready:
+          on_events:
+            analyze:
+              transition_to: analyzing
+              action:
+                - send:
+                    event: analysis_requested
+                    to: {external: true}
+                    correlation_id: event.payload.request_id
+                    payload: {text: event.payload.text}
+        analyzing:
+          on_events:
+            analysis_ready:
+              transition_to: routed
+              action:
+                - assign: {category: event.payload.category}
+                - assign: {summary: event.payload.summary}
+        routed: {}
