@@ -28,7 +28,9 @@ and advances the machine in one new SQLite transaction. Task submission means
 Cloud Tasks accepted the task, not that the HTTP callback completed its business
 work. Real callback success would require another declared input.
 
-The handler uses a stable task name derived from the effect ID. If Cloud Tasks
+The application durably binds each handler name to its queue and refuses changed
+destinations on restart or before dispatch. The handler uses a stable task name
+derived from the effect ID. If Cloud Tasks
 reports `AlreadyExists`, it reads the retained task with the FULL view and verifies
 its HTTP request before recording submission. Cloud Tasks retention is finite;
 this is not a distributed exactly-once guarantee. This application-owned adapter

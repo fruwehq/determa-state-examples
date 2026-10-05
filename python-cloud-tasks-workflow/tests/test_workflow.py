@@ -81,8 +81,23 @@ def test_conflicting_existing_task_cannot_advance_workflow(tmp_path):
     client, _, workflow = setup(tmp_path)
     workflow.enqueue("conflict", "https://example.com/dispatch", "{}")
     client.create_task = Mock(side_effect=AlreadyExists("conflict"))
-    client.get_task = Mock(return_value=tasks_v2.Task(http_request=tasks_v2.HttpRequest(url="https://other.example")))
+    client.get_task = Mock(
+        return_value=tasks_v2.Task(http_request=tasks_v2.HttpRequest(url="https://other.example"))
+    )
     with pytest.raises(ValueError, match="differs"):
         workflow.drain()
     with sqlite3.connect(workflow.path) as connection:
         assert connection.execute("SELECT outcome FROM effects").fetchone()[0] is None
+
+
+def test_restart_and_mutated_registry_cannot_retarget_pending_effect(tmp_path):
+    client, handler, workflow = setup(tmp_path)
+    workflow.enqueue("pinned", "https://example.com/dispatch", "{}")
+    replacement = CloudTasksHandler(client, "projects/other/locations/us-central1/queues/other")
+    with pytest.raises(ValueError, match="immutable binding"):
+        Workflow(workflow.path, {"cloud-tasks.v1": replacement})
+    handler.queue = replacement.queue
+    client.create_task = Mock()
+    with pytest.raises(ValueError, match="immutable binding"):
+        workflow.drain()
+    client.create_task.assert_not_called()
