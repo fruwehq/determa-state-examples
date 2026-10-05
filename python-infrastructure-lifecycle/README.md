@@ -102,6 +102,10 @@ Later desired changes cannot rewrite an outstanding provider request. A matching
 `resource_applied` updates observed state from the original request, leaving any newer
 desired state for the next explicit reconciliation. Stale tokens or changed original
 request values cannot update observed state.
+Used operation tokens remain in machine state across completed/rejected work; an
+A-to-B-to-A reuse cannot create a new invocation. Applied results must also match the
+pinned next resource revision. This example's revision counter uses CEL's signed
+64-bit arithmetic; exhaustion fails before an emitted request.
 
 An unknown provider result retains pending work in `uncertain`; another `reconcile`
 cannot start work there. Native acceptance evidence must be reconciled by the pending

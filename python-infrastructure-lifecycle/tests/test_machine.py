@@ -172,6 +172,37 @@ class MachineTests(unittest.TestCase):
         self.assertEqual(self.values()["observed_revision"], "1")
         self.assertFalse(self.values()["pending"])
 
+    def test_historical_identity_reuse_and_revision_rollback_are_rejected(self):
+        self.request()
+        self.applied()
+        self.process("set_desired", present=False, size="small")
+        self.process("reconcile", operation_token="remove-B")
+        self.process(
+            "resource_applied",
+            operation_token="remove-B",
+            revision="1",
+            present=False,
+            size="small",
+        )
+        self.process("set_desired", present=True, size="small")
+        before = self.values()
+        self.assertEqual(
+            self.process("reconcile", operation_token="op-A")["emissions"], []
+        )
+        self.assertEqual(self.values(), before)
+        self.process("reconcile", operation_token="op-C")
+        before = self.values()
+        self.applied(token="op-A", revision="0")
+        self.assertEqual(self.values(), before)
+        self.applied(token="op-C", revision="0")
+        self.assertEqual(self.values(), before)
+        self.applied(token="op-C", revision="2")
+        self.assertEqual(self.values()["observed_revision"], "2")
+        self.assertFalse(self.values()["pending"])
+        self.assertEqual(
+            self.values()["used_operation_tokens"], ["op-A", "remove-B", "op-C"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

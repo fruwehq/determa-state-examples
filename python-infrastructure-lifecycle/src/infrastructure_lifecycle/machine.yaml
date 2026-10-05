@@ -97,6 +97,15 @@ machines:
       requested_size:
         type: string
         init: small
+      used_operation_tokens:
+        type: list
+        init: []
+      expected_result_revision:
+        type: string
+        init: ''
+      observed_revision_number:
+        type: int
+        init: -1
     initial:
       transition_to: stable
     on_events:
@@ -110,12 +119,16 @@ machines:
       stable:
         on_events:
           reconcile:
-            guard: event.payload.operation_token != '' && event.payload.operation_token != operation_token && (!observed_known
-              || desired_present != observed_present || desired_size != observed_size)
+            guard: event.payload.operation_token != '' && !(event.payload.operation_token in used_operation_tokens)
+              && (!observed_known || desired_present != observed_present || desired_size != observed_size)
             transition_to: applying
             action:
             - assign:
                 operation_token: event.payload.operation_token
+            - assign:
+                used_operation_tokens: used_operation_tokens + [event.payload.operation_token]
+            - assign:
+                expected_result_revision: string(observed_revision_number + 1)
             - assign:
                 pending: 'true'
             - assign:
@@ -137,7 +150,7 @@ machines:
         on_events:
           resource_applied:
             guard: pending && event.payload.operation_token == operation_token && event.payload.present == requested_present
-              && event.payload.size == requested_size
+              && event.payload.size == requested_size && event.payload.revision == expected_result_revision
             transition_to: stable
             action:
             - assign:
@@ -148,6 +161,8 @@ machines:
                 observed_size: event.payload.size
             - assign:
                 observed_revision: event.payload.revision
+            - assign:
+                observed_revision_number: observed_revision_number + 1
             - assign:
                 pending: 'false'
           resource_rejected:
@@ -163,7 +178,7 @@ machines:
         on_events:
           resource_applied:
             guard: pending && event.payload.operation_token == operation_token && event.payload.present == requested_present
-              && event.payload.size == requested_size
+              && event.payload.size == requested_size && event.payload.revision == expected_result_revision
             transition_to: stable
             action:
             - assign:
@@ -174,6 +189,8 @@ machines:
                 observed_size: event.payload.size
             - assign:
                 observed_revision: event.payload.revision
+            - assign:
+                observed_revision_number: observed_revision_number + 1
             - assign:
                 pending: 'false'
           resource_rejected:
