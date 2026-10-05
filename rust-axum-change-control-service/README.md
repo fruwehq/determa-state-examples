@@ -1,7 +1,7 @@
 # Rust Axum change-control service
 
 A complete deployment change-control API built with Rust, Axum, Determa State
-0.2.0, and the released SQLite `CheckpointHost`.
+the unreleased 0.3.0 candidate and its version-1 SQLite `CheckpointHost`.
 
 The workflow is operational rather than illustrative: a requester submits a change, a
 reviewer starts review and approves or rejects it, and an operator reports deployment
@@ -17,9 +17,9 @@ does not pretend to deliver either intent automatically.
 - Axum owns HTTP, request validation, and the example's `x-actor-id` / `x-actor-role`
   authorization policy. These identities are application data, not Determa identity
   semantics.
-- Rust's released `CheckpointHost` performs foreground creation and dispatch.
-- `SqliteExecutionStore` durably stores aggregate state, accepted operation receipts,
-  pending deliveries, and outbox records with revision/digest compare-and-swap.
+- Rust's `CheckpointHost` creates version-1 checkpoints and admits/processes normalized delivery envelopes.
+- `SqliteExecutionStore` durably stores aggregate state, retained delivery receipts,
+  ready/deferred queues, and outbox records with revision/digest compare-and-swap.
 - Every mutating request supplies a stable operation ID and the last observed revision
   plus checkpoint digest. Exact retries replay; stale revisions and changed reuse of an
   operation ID fail.
@@ -138,5 +138,9 @@ make reset
 ```
 
 Do not delete or edit rows in a live store. Definition migration, backup/relocation,
-effect delivery workers, timers, and remote hosting require their own released
+effect delivery workers, timers, and remote hosting require their own qualified
 contracts and are intentionally outside this example.
+
+This candidate uses the exact public Git commit in `Cargo.toml`, `Cargo.lock`, and
+`source-lock.json`; no 0.3.0 release or tag is assumed. Use a fresh disposable database
+when upgrading this example from 0.2.0. Machine definitions retain numeric `format: 1`.

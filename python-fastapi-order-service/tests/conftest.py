@@ -67,7 +67,7 @@ def aggregate_order_status(database_path: Path, order_id: str) -> str:
             "SELECT aggregate_bytes FROM orders WHERE order_id = ?", (order_id,)
         ).fetchone()
     assert row is not None
-    restored = ds.restore_aggregate(
+    restored = ds.restore_aggregate_v1(
         bytes(row[0]), DefinitionRegistry.load().resolver
     )
     root = restored.state["runtimes"][restored.state["root_runtime_id"]]

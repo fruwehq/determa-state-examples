@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "determa-fastapi-order-service-example"
-version = "0.2.0"
+version = "0.3.0"
 description = "A durable FastAPI order workflow powered by Determa State"
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 license = { text = "MIT" }
 dependencies = [
-  "determa-state==0.2.0",
+  "determa-state @ git+https://github.com/fruwehq/determa-state-python.git@61fd77ed2e73365e80739d6d99c50c54fc6f0da6",
   "fastapi==0.116.1",
   "uvicorn==0.35.0",
 ]
@@ -28,6 +28,9 @@ order-service = "order_service.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/order_service"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel.force-include]
 "machines" = "order_service/machines"

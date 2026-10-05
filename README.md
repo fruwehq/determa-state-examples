@@ -5,20 +5,20 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
 
 ## Example catalog
 
-- [Python FastAPI order service](python-fastapi-order-service/) - a Determa State 0.2.0
+- [Python FastAPI order service](python-fastapi-order-service/) - a unreleased Determa State 0.3.0
   direct-library
   integration with a realistic payment and fulfillment lifecycle, transactional
   SQLite inbox/aggregate/outbox persistence, restart recovery, idempotent effect
   delivery, and lazy definition migration.
 - [Rust Axum change-control service](rust-axum-change-control-service/) - a Determa
-  State 0.2.0 `CheckpointHost` integration with durable SQLite checkpoints, stable
+  State 0.3.0 candidate `CheckpointHost` integration with durable SQLite checkpoints, stable
   operation replay, optimistic concurrency, auditable deployment and rollback
   intents, restart recovery, and terminal change outcomes.
 
 The collection is intended to grow across languages, frameworks, and integration
 styles:
 
-- **Direct library integrations** embed a released Determa State implementation.
+- **Direct library integrations** embed an exact public candidate commit during the approved unreleased 0.3.0 implementation.
 - **Language-neutral integrations** will communicate with a separate Determa State
   process after a suitable execution protocol or interface exists.
 

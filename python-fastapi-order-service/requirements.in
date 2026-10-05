@@ -1,4 +1,9 @@
-determa-state==0.2.0
+# The unreleased engine is installed from source-lock.json after these hashed dependencies.
+pyyaml>=6
+jsonschema>=4
+cel-python>=0.1
+rfc8785>=0.1.4
+typing-extensions>=4.16
 fastapi==0.116.1
 hatchling==1.27.0
 uvicorn==0.35.0

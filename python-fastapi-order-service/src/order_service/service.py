@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import determa.state as ds
+from determa.state.wire import canonical_bytes, decoded_typed_value
 
 from .database import Database
 from .definitions import DefinitionRegistry
@@ -71,9 +72,10 @@ class OrderService:
             state = created["state"]
             if state is None or created["status"] == "faulted":
                 raise CommandRejectedError(f"creation failed: {created['fault']}")
-            aggregate = ds.serialize_aggregate(self.current_bundle, state)
+            aggregate = canonical_bytes(state)
+            restored = ds.restore_aggregate_v1(aggregate, self.definitions.resolver)
             view = self._view_from_state(
-                order_id, customer_id, amount_cents, self.current_bundle, state, aggregate
+                order_id, customer_id, amount_cents, self.current_bundle, restored.state, aggregate
             )
             connection.execute(
                 """
@@ -92,9 +94,7 @@ class OrderService:
                 ),
             )
             self._store_emissions(connection, order_id, created["emissions"])
-            self._record_inbox(
-                connection, event_id, order_id, "create_order", payload, view
-            )
+            self._record_inbox(connection, event_id, order_id, "create_order", payload, view)
             return CommandResult(view, False, False)
 
     def apply_event(
@@ -110,7 +110,7 @@ class OrderService:
             duplicate = self._duplicate(connection, event_id, order_id, event_name, payload)
             if duplicate is not None:
                 return CommandResult(duplicate, True, False)
-            restored = ds.restore_aggregate(
+            restored = ds.restore_aggregate_v1(
                 bytes(row["aggregate_bytes"]), self.definitions.resolver
             )
             target = {
@@ -119,12 +119,7 @@ class OrderService:
                     "root_runtime_id": restored.state["root_runtime_id"],
                 }
             }
-            envelope = {
-                "event": event_name,
-                "event_id": event_id,
-                "target": target,
-                "payload": payload,
-            }
+            envelope = ds.portable_envelope(event_name, event_id, target, payload)
             declaration = (self.current_bundle.raw.get("events") or {}).get(event_name, {})
             if declaration.get("correlates_to"):
                 envelope["correlation_id"] = order_id
@@ -132,41 +127,46 @@ class OrderService:
                 restored.bundle.fingerprint, self.current_bundle.fingerprint
             )
             if route:
-                outcome = ds.migrate_and_dispatch(
+                outcome = ds.migrate_aggregate_v1(
                     bytes(row["aggregate_bytes"]),
                     self.current_bundle.fingerprint,
                     route,
                     self.definitions.resolver,
-                    {"input": envelope},
                     maintenance_mode=False,
                 )
-                if outcome.failure is not None:
-                    raise CommandRejectedError(f"migration failed: {outcome.failure.code}")
-                aggregate = outcome.aggregate_bytes
-                emissions = list(outcome.emissions)
-                disposition = outcome.disposition
-                rejection = outcome.rejection
-                audits = list(outcome.audit_records)
+                if outcome["result"] != "success":
+                    raise CommandRejectedError(f"migration failed: {outcome}")
+                candidate = outcome["aggregate_state"]
+                audits = outcome["audit_records"]
                 migration_applied = True
             else:
-                core = ds.dispatch(
-                    self.current_bundle,
-                    restored.state,
-                    {"input": envelope},
-                )
-                state = core["state"]
-                if state is None:
-                    raise CommandRejectedError("dispatch returned no aggregate")
-                aggregate = ds.serialize_aggregate(self.current_bundle, state)
-                emissions = core["emissions"]
-                disposition = core["disposition"]
-                rejection = core["rejection"]
+                candidate = restored.aggregate_envelope
                 audits = []
                 migration_applied = False
+            admitted = ds.admit(
+                candidate,
+                [
+                    {
+                        "delivery_mode": "input",
+                        "envelope": envelope,
+                        "envelope_digest": ds.delivery_request_digest(order_id, "input", envelope),
+                    }
+                ],
+                self.definitions.resolver,
+            )
+            if admitted["result"] == "rejected":
+                raise CommandRejectedError(f"admission failed: {admitted['rejection']}")
+            core = ds.step(
+                admitted["state"], candidate["root_runtime_id"], self.definitions.resolver
+            )
+            aggregate = canonical_bytes(core["state"])
+            emissions = core["emissions"]
+            disposition = core["disposition"]
+            rejection = core["rejection"]
             if aggregate is None or disposition != "handled":
                 detail = rejection or {"code": disposition or "unknown"}
                 raise CommandRejectedError(f"event was not handled: {detail}")
-            restored_result = ds.restore_aggregate(aggregate, self.definitions.resolver)
+            restored_result = ds.restore_aggregate_v1(aggregate, self.definitions.resolver)
             view = self._view_from_state(
                 order_id,
                 str(row["customer_id"]),
@@ -204,15 +204,13 @@ class OrderService:
                         self._json(audit),
                     ),
                 )
-            self._record_inbox(
-                connection, event_id, order_id, event_name, payload, view
-            )
+            self._record_inbox(connection, event_id, order_id, event_name, payload, view)
             return CommandResult(view, False, migration_applied)
 
     def migrate_order(self, order_id: str) -> CommandResult:
         with self.database.transaction() as connection:
             row = self._order_row(connection, order_id)
-            restored = ds.restore_aggregate(
+            restored = ds.restore_aggregate_v1(
                 bytes(row["aggregate_bytes"]), self.definitions.resolver
             )
             route = self.definitions.route(
@@ -228,26 +226,24 @@ class OrderService:
                     bytes(row["aggregate_bytes"]),
                 )
                 return CommandResult(view, False, False)
-            outcome = ds.migrate_aggregate(
+            outcome = ds.migrate_aggregate_v1(
                 bytes(row["aggregate_bytes"]),
                 self.current_bundle.fingerprint,
                 route,
                 self.definitions.resolver,
                 maintenance_mode=True,
             )
-            if outcome.failure is not None or outcome.aggregate_bytes is None:
-                code = outcome.failure.code if outcome.failure is not None else "missing_aggregate"
-                raise CommandRejectedError(f"migration failed: {code}")
-            restored_result = ds.restore_aggregate(
-                outcome.aggregate_bytes, self.definitions.resolver
-            )
+            if outcome["result"] != "success":
+                raise CommandRejectedError(f"migration failed: {outcome}")
+            aggregate = canonical_bytes(outcome["aggregate_state"])
+            restored_result = ds.restore_aggregate_v1(aggregate, self.definitions.resolver)
             view = self._view_from_state(
                 order_id,
                 str(row["customer_id"]),
                 int(row["amount_cents"]),
                 restored_result.bundle,
                 restored_result.state,
-                outcome.aggregate_bytes,
+                aggregate,
             )
             connection.execute(
                 """
@@ -259,11 +255,11 @@ class OrderService:
                 (
                     view["lifecycle_status"],
                     restored_result.bundle.fingerprint,
-                    outcome.aggregate_bytes,
+                    aggregate,
                     order_id,
                 ),
             )
-            for audit in outcome.audit_records:
+            for audit in outcome["audit_records"]:
                 connection.execute(
                     """
                     INSERT INTO migration_audits (
@@ -282,7 +278,7 @@ class OrderService:
     def get_order(self, order_id: str) -> dict[str, Any]:
         with self.database.connect() as connection:
             row = self._order_row(connection, order_id)
-            restored = ds.restore_aggregate(
+            restored = ds.restore_aggregate_v1(
                 bytes(row["aggregate_bytes"]), self.definitions.resolver
             )
             return self._view_from_state(
@@ -300,7 +296,7 @@ class OrderService:
         if order_id is not None:
             query += " WHERE order_id = ?"
             parameters = (order_id,)
-        query += " ORDER BY order_id, sequence"
+        query += " ORDER BY order_id, length(sequence), sequence"
         with self.database.connect() as connection:
             return [self._outbox_view(row) for row in connection.execute(query, parameters)]
 
@@ -368,9 +364,7 @@ class OrderService:
     def _order_row(self, connection: sqlite3.Connection, order_id: str) -> sqlite3.Row:
         row = cast(
             sqlite3.Row | None,
-            connection.execute(
-                "SELECT * FROM orders WHERE order_id = ?", (order_id,)
-            ).fetchone(),
+            connection.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone(),
         )
         if row is None:
             raise OrderNotFoundError(order_id)
@@ -384,9 +378,7 @@ class OrderService:
         event_name: str,
         payload: dict[str, Any],
     ) -> dict[str, Any] | None:
-        row = connection.execute(
-            "SELECT * FROM inbox WHERE event_id = ?", (event_id,)
-        ).fetchone()
+        row = connection.execute("SELECT * FROM inbox WHERE event_id = ?", (event_id,)).fetchone()
         if row is None:
             return None
         if (
@@ -428,8 +420,6 @@ class OrderService:
         emissions: list[dict[str, Any]],
     ) -> None:
         for emission in emissions:
-            if emission.get("target") != "external":
-                raise CommandRejectedError("this host only accepts external output intents")
             connection.execute(
                 """
                 INSERT INTO outbox (
@@ -443,7 +433,7 @@ class OrderService:
                     emission["sequence"],
                     emission["event"],
                     emission["correlation_id"],
-                    self._json(emission["payload"]),
+                    self._json(decoded_typed_value(emission["payload"])),
                 ),
             )
 

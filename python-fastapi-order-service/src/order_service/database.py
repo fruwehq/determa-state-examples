@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS inbox (
 CREATE TABLE IF NOT EXISTS outbox (
     effect_id TEXT PRIMARY KEY,
     order_id TEXT NOT NULL,
-    sequence INTEGER NOT NULL,
+    sequence TEXT NOT NULL,
     event_name TEXT NOT NULL,
     correlation_id TEXT NOT NULL,
     payload_json TEXT NOT NULL,

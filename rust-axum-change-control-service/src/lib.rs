@@ -7,11 +7,10 @@ use axum::{
 };
 use determa_state::{
     checkpoint::{
-        CheckpointHost, CreationRequest, DeliveryRequest, DurableStoreMode, ExecutionCheckpoint,
-        ExecutionStore, HostFailure, HostFailureCode, MutationGuard, OperationReceipt,
+        CheckpointHost, DurableStoreMode, ExecutionCheckpoint, ExecutionStore, MutationGuard,
         SqliteExecutionStore,
     },
-    load_bundle, restore_aggregate, Bindings, Bundle, InMemoryDefinitionResolver, Target,
+    load_bundle, restore_aggregate, ArtifactError, Bindings, Bundle, InMemoryDefinitionResolver,
     TypedValue, Value,
 };
 use serde::{Deserialize, Serialize};
@@ -123,15 +122,13 @@ impl IntoResponse for ApiError {
     }
 }
 
-impl From<HostFailure> for ApiError {
-    fn from(value: HostFailure) -> Self {
-        let (status, code) = match value.code {
-            HostFailureCode::CheckpointNotFound => (StatusCode::NOT_FOUND, "change_not_found"),
-            HostFailureCode::CheckpointRevisionConflict => {
-                (StatusCode::CONFLICT, "revision_conflict")
-            }
-            HostFailureCode::CreationIdConflict => (StatusCode::CONFLICT, "creation_id_conflict"),
-            HostFailureCode::EventIdConflict => (StatusCode::CONFLICT, "operation_id_conflict"),
+impl From<ArtifactError> for ApiError {
+    fn from(value: ArtifactError) -> Self {
+        let (status, code) = match value.code.as_str() {
+            "checkpoint_not_found" => (StatusCode::NOT_FOUND, "change_not_found"),
+            "checkpoint_revision_conflict" => (StatusCode::CONFLICT, "revision_conflict"),
+            "creation_id_conflict" => (StatusCode::CONFLICT, "creation_id_conflict"),
+            "event_id_conflict" => (StatusCode::CONFLICT, "operation_id_conflict"),
             _ => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "checkpoint_operation_failed",
@@ -195,7 +192,7 @@ pub fn router(state: AppState) -> Router {
 
 async fn health() -> Json<JsonValue> {
     Json(
-        json!({ "status": "ok", "service": "Determa State change control", "determa_state": "0.2.0" }),
+        json!({ "status": "ok", "service": "Determa State change control", "determa_state": "0.3.0" }),
     )
 }
 
@@ -217,16 +214,16 @@ async fn create_change(
         ]),
         external: BTreeMap::new(),
     };
-    state.host.create(CreationRequest {
-        bundle: &state.bundle,
-        namespace: "example.change_control",
-        machine_id: MACHINE_ID,
-        machine_version: 1,
-        root_instance_id: &input.change_id,
-        creation_id: &input.creation_id,
-        bindings: &bindings,
-        supplied_request_digest: None,
-    })?;
+    state.host.create_checkpoint(
+        &state.bundle,
+        MACHINE_ID,
+        &input.change_id,
+        &input.creation_id,
+        &bindings,
+        None,
+        json!({"mode":"bounded","permanent_replay_eligible":false,
+            "pruned_through_receipt_sequence":null,"policy_identifier":"change-control-v1"}),
+    )?;
     let change = inspect(&state, &input.change_id)?;
     Ok((
         if before.is_some() {
@@ -258,11 +255,11 @@ async fn get_outbox(
     authorize(&headers, Role::Operator)?;
     let checkpoint = checkpoint(&state, &change_id)?;
     Ok(Json(json!({
-        "revision": checkpoint.revision,
-        "checkpoint_digest": checkpoint.execution_checkpoint_digest,
-        "pending": checkpoint.pending_outbox_intents,
-        "terminal": checkpoint.terminal_outbox_records,
-        "tombstones": checkpoint.outbox_effect_tombstones,
+        "revision": checkpoint.revision(),
+        "checkpoint_digest": checkpoint.digest(),
+        "pending": checkpoint.value()["pending_outbox_intents"],
+        "terminal": checkpoint.value()["terminal_outbox_records"],
+        "tombstones": checkpoint.value()["outbox_effect_tombstones"],
     })))
 }
 
@@ -409,55 +406,72 @@ fn dispatch_command(
 ) -> Result<CommandResult, ApiError> {
     require_nonempty(&command.operation_id, "operation_id")?;
     let before = checkpoint(state, root)?;
-    let aggregate = before
-        .retained_aggregate()
-        .ok_or_else(ApiError::not_found)?;
-    let root_runtime = aggregate
-        .runtimes
+    let aggregate = &before.value()["root_record"]["aggregate_state"];
+    let root_runtime = aggregate["runtimes"]
+        .as_array()
+        .ok_or_else(ApiError::not_found)?
         .iter()
-        .find(|runtime| runtime.runtime_id == aggregate.root_runtime_id)
+        .find(|runtime| runtime["runtime_id"] == aggregate["root_runtime_id"])
         .ok_or_else(|| ApiError::bad_request("root runtime is absent"))?;
-    let replayed = before.operation_receipts.iter().any(|receipt| {
-        matches!(receipt, OperationReceipt::Delivery(value) if value.event_id == command.operation_id)
-    });
-    let terminal = root_runtime
-        .active_leaf_state_definition_pointers
+    let replayed = before.value()["operation_receipts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|receipt| {
+            receipt["operation_kind"] == "event_terminal"
+                && receipt["event_id"] == command.operation_id
+        });
+    let terminal = root_runtime["active_leaf_state_definition_pointers"]
+        .as_array()
+        .unwrap()
         .iter()
         .any(|pointer| {
             TERMINAL_STATES
                 .iter()
-                .any(|state| pointer.ends_with(&format!("/{state}")))
+                .any(|state| pointer.as_str().unwrap().ends_with(&format!("/{state}")))
         });
-    if !replayed && (terminal || format!("{:?}", root_runtime.status).to_lowercase() != "running") {
+    if !replayed && (terminal || root_runtime["status"] != "running") {
         return Err(ApiError {
             status: StatusCode::UNPROCESSABLE_ENTITY,
             code: "terminal_change",
             message: "completed or faulted changes do not accept commands".into(),
         });
     }
-    let root_runtime_id = aggregate.root_runtime_id.clone();
-    let candidate = json!({
-        "root_instance_id": root,
-        "delivery_mode": "input",
-        "origin": { "kind": "host_input" },
-        "envelope": {
+    let mut envelope = json!({
             "event": event,
             "event_id": command.operation_id,
-            "target": Target::Root { root_instance_id: root.to_owned(), root_runtime_id },
+            "cause_id": command.operation_id,
+            "source": {"host":true},
+            "target": root_runtime["target_identity"],
             "payload": TypedValue::from_value(&Value::Map(payload)),
-            "correlation_id": correlation_id,
-        }
     });
-    let receipt = state.host.foreground_process_delivery(
-        DeliveryRequest {
-            checkpoint_root_instance_id: root.to_owned(),
-            candidate,
-            guard: MutationGuard::new(
-                &command.expected_revision,
-                &command.expected_checkpoint_digest,
-            ),
-        },
-        None,
+    if let Some(correlation_id) = correlation_id {
+        envelope["correlation_id"] = json!(correlation_id);
+    }
+    use sha2::{Digest, Sha256};
+    let operand = json!([
+        "determa-inbox-envelope-digest-1",
+        "1",
+        root,
+        "input",
+        envelope
+    ]);
+    let digest = format!(
+        "sha256:{:x}",
+        Sha256::digest(
+            serde_json_canonicalizer::to_vec(&operand)
+                .map_err(|e| ApiError::bad_request(e.to_string()))?
+        )
+    );
+    let candidate = json!({"delivery_mode":"input","envelope":envelope,"envelope_digest":digest});
+    let receipt = state.host.process_checkpoint(
+        root,
+        &candidate,
+        "foreground",
+        &MutationGuard::new(
+            &command.expected_revision,
+            &command.expected_checkpoint_digest,
+        ),
     )?;
     drop(receipt);
     Ok(CommandResult {
@@ -468,12 +482,12 @@ fn dispatch_command(
 
 fn inspect(state: &AppState, root: &str) -> Result<ChangeView, ApiError> {
     let checkpoint = checkpoint(state, root)?;
-    let aggregate = checkpoint
-        .retained_aggregate()
-        .ok_or_else(ApiError::not_found)?;
+    let aggregate = &checkpoint.value()["root_record"]["aggregate_state"];
+    if aggregate.is_null() {
+        return Err(ApiError::not_found());
+    }
     let restored = restore_aggregate(
-        &aggregate
-            .canonical_bytes()
+        &serde_json_canonicalizer::to_vec(aggregate)
             .map_err(|e| ApiError::bad_request(e.to_string()))?,
         state.resolver.as_ref(),
     )
@@ -501,14 +515,28 @@ fn inspect(state: &AppState, root: &str) -> Result<ChangeView, ApiError> {
     };
     Ok(ChangeView {
         change_id: root.to_owned(),
-        revision: checkpoint.revision.to_string(),
-        checkpoint_digest: checkpoint.execution_checkpoint_digest,
+        revision: checkpoint.revision().to_owned(),
+        checkpoint_digest: checkpoint.digest().to_owned(),
         status: runtime_status,
         state: active_state,
         variables,
-        pending_delivery_count: checkpoint.pending_deliveries.len(),
-        pending_outbox_count: checkpoint.pending_outbox_intents.len(),
-        terminal_outbox_count: checkpoint.terminal_outbox_records.len(),
+        pending_delivery_count: aggregate["runtimes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| {
+                r["ready_mailbox"].as_array().unwrap().len()
+                    + r["deferred_mailbox"].as_array().unwrap().len()
+            })
+            .sum(),
+        pending_outbox_count: checkpoint.value()["pending_outbox_intents"]
+            .as_array()
+            .unwrap()
+            .len(),
+        terminal_outbox_count: checkpoint.value()["terminal_outbox_records"]
+            .as_array()
+            .unwrap()
+            .len(),
     })
 }
 

@@ -238,6 +238,8 @@ dependencies = [
  "http-body-util",
  "serde",
  "serde_json",
+ "serde_json_canonicalizer",
+ "sha2",
  "tempfile",
  "tokio",
  "tower",
@@ -247,9 +249,8 @@ dependencies = [
 
 [[package]]
 name = "determa-state"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c16d4cfe05f555ab6c9ef7eeb0bc4d3df346c71efd2098a89eb8551e10039444"
+version = "0.3.0"
+source = "git+https://github.com/fruwehq/determa-state-rust?rev=272e37e7255ae4c650f714a94ea6cddea61d245d#272e37e7255ae4c650f714a94ea6cddea61d245d"
 dependencies = [
  "cel-parser",
  "fs2",
