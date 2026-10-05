@@ -126,7 +126,7 @@ impl From<ArtifactError> for ApiError {
     fn from(value: ArtifactError) -> Self {
         let (status, code) = match value.code.as_str() {
             "checkpoint_not_found" => (StatusCode::NOT_FOUND, "change_not_found"),
-            "checkpoint_conflict" => (StatusCode::CONFLICT, "revision_conflict"),
+            "checkpoint_revision_conflict" => (StatusCode::CONFLICT, "revision_conflict"),
             "creation_id_conflict" => (StatusCode::CONFLICT, "creation_id_conflict"),
             "event_id_conflict" => (StatusCode::CONFLICT, "operation_id_conflict"),
             _ => (
@@ -192,7 +192,7 @@ pub fn router(state: AppState) -> Router {
 
 async fn health() -> Json<JsonValue> {
     Json(
-        json!({ "status": "ok", "service": "Determa State change control", "determa_state": "0.2.0" }),
+        json!({ "status": "ok", "service": "Determa State change control", "determa_state": "0.3.0" }),
     )
 }
 

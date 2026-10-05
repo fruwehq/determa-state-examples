@@ -11,7 +11,7 @@ def test_openapi_reports_example_version(client: TestClient) -> None:
     response = client.get("/openapi.json")
 
     assert response.status_code == 200
-    assert response.json()["info"]["version"] == "0.2.0"
+    assert response.json()["info"]["version"] == "0.3.0"
 
 
 def test_happy_path_persists_effects_and_requires_later_outcomes(

@@ -50,7 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Determa State order service",
-        version="0.2.0",
+        version="0.3.0",
         lifespan=lifespan,
     )
     app.state.order_service = service

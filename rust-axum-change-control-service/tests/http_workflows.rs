@@ -78,6 +78,16 @@ async fn request(
     (status, value)
 }
 
+#[tokio::test]
+async fn health_identifies_the_candidate_engine() {
+    let app = TestApp::new();
+    let (status, health) = app
+        .request("GET", "/health", "requester", "alice", json!({}))
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(health["determa_state"], "0.3.0");
+}
+
 async fn create(app: &TestApp, change_id: &str) -> Value {
     let (status, body) = app
         .request(
