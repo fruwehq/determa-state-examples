@@ -367,3 +367,7 @@ The candidate installer verifies the allowlisted public repository, exact commit
 clean checkout, and engine version. No 0.3.0 release or tag is assumed. Use a fresh
 disposable database when upgrading this example from 0.2.0. Machine definitions
 retain numeric `format: 1`; persistence uses version-1 artifacts.
+
+Run the standalone container workflow, outbox, idempotency, and restart check with
+`make container-check`. Corporate proxies may supply a combined CA through the
+optional BuildKit `extra_ca` secret; TLS verification remains enabled.

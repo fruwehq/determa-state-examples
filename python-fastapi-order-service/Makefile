@@ -18,3 +18,6 @@ start: install run
 
 reset:
 	rm -f var/orders.sqlite3
+
+container-check:
+	python scripts/container-e2e.py

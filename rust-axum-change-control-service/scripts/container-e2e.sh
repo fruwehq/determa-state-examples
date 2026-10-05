@@ -24,7 +24,9 @@ wait_for_health() {
   return 1
 }
 
-docker build -t "${image}" .
+if [ "${EXAMPLE_PREBUILT_IMAGE:-0}" != "1" ]; then
+  docker build -t "${image}" .
+fi
 docker volume create "${volume}" >/dev/null
 docker run -d --name "${container}" -p "${port}:8080" -v "${volume}:/data" "${image}" >/dev/null
 wait_for_health
