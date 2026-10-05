@@ -250,7 +250,7 @@ dependencies = [
 [[package]]
 name = "determa-state"
 version = "0.3.0"
-source = "git+https://github.com/fruwehq/determa-state-rust?rev=efaed0a21409f75ed55f159a6f8c833f3b62e88c#efaed0a21409f75ed55f159a6f8c833f3b62e88c"
+source = "git+https://github.com/fruwehq/determa-state-rust?rev=272e37e7255ae4c650f714a94ea6cddea61d245d#272e37e7255ae4c650f714a94ea6cddea61d245d"
 dependencies = [
  "cel-parser",
  "fs2",

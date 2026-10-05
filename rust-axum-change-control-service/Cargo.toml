@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 axum = "0.8.4"
-determa-state = { git = "https://github.com/fruwehq/determa-state-rust", rev = "efaed0a21409f75ed55f159a6f8c833f3b62e88c", version = "=0.3.0", default-features = false, features = ["sqlite"] }
+determa-state = { git = "https://github.com/fruwehq/determa-state-rust", rev = "272e37e7255ae4c650f714a94ea6cddea61d245d", version = "=0.3.0", default-features = false, features = ["sqlite"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
 serde_json_canonicalizer = "0.3"
