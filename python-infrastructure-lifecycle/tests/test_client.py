@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import os
 import signal
 import tempfile
@@ -54,6 +55,17 @@ class ClientTests(unittest.TestCase):
             with self.assertRaisesRegex(ProviderError, "unauthorized_scope"):
                 client.verify_retained({**REQUEST, "scope_identity": "another"}, {})
             self.assertEqual(client.execute(REQUEST)["resource"]["revision"], "0")
+
+    def test_native_verification_keeps_boolean_and_integer_values_distinct(self):
+        with ProviderProcess(self.path, "local-infra") as client:
+            first = client.execute(REQUEST)
+            changed_request = copy.deepcopy(REQUEST)
+            changed_request["desired"]["present"] = 1
+            self.assertFalse(client.verify_retained(changed_request, first))
+            changed_response = copy.deepcopy(first)
+            changed_response["resource"]["desired"]["present"] = 1
+            self.assertFalse(client.verify_retained(REQUEST, changed_response))
+            self.assertTrue(client.verify_retained(REQUEST, first))
 
     def test_dead_transport_never_retries_or_resets_destination(self):
         with ProviderProcess(self.path, "local-infra") as client:

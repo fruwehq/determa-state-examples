@@ -130,12 +130,13 @@ class ProviderProcess:
     ) -> bool:
         if request.get("scope_identity") != self.scope:
             raise ProviderError("unauthorized_scope")
+        expected = canonical(
+            {"status": "committed", "request": request, "response": response}
+        )
         actual = self.inspect(request["effect_id"])
-        return actual == {
-            "status": "committed",
-            "request": request,
-            "response": response,
-        }
+        # Python equality conflates JSON booleans and integers; native retained
+        # evidence binds their distinct serialized values.
+        return canonical(actual) == expected
 
     def _close(self) -> None:
         self._closed = True
