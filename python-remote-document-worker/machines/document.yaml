@@ -1,0 +1,46 @@
+format: 1
+namespace: examples.remote_document
+events:
+  build:
+    direction: input
+    payload:
+      text: {type: string, required: true}
+      request_id: {type: string, required: true}
+  document_requested:
+    direction: output
+    payload:
+      text: {type: string, required: true}
+  document_ready:
+    direction: input
+    correlates_to: document_requested
+    payload:
+      artifact_digest: {type: string, required: true}
+      byte_count: {type: int, required: true}
+machines:
+  - machine_id: document
+    version: 1
+    root:
+      type: composite
+      variables:
+        artifact_digest: {type: string, init: ""}
+        byte_count: {type: int, init: 0}
+      initial: {transition_to: ready}
+      states:
+        ready:
+          on_events:
+            build:
+              transition_to: building
+              action:
+                - send:
+                    event: document_requested
+                    to: {external: true}
+                    correlation_id: event.payload.request_id
+                    payload: {text: event.payload.text}
+        building:
+          on_events:
+            document_ready:
+              transition_to: available
+              action:
+                - assign: {artifact_digest: event.payload.artifact_digest}
+                - assign: {byte_count: event.payload.byte_count}
+        available: {}
