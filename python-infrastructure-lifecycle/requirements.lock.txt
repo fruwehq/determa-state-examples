@@ -1,0 +1,2 @@
+# Provider checkpoint uses only Python 3.11+ standard library.
+# Add exact reviewed State source/dependency locks with host integration.

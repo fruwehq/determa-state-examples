@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "determa-infrastructure-lifecycle-example"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "Unfinished unreleased Determa State 0.3.0 infrastructure lifecycle application"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
