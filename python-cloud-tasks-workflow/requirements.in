@@ -1,0 +1,10 @@
+# Exact State source is separately verified by source-lock.json.
+google-cloud-tasks==2.21.0
+pyyaml>=6
+jsonschema>=4
+cel-python>=0.1
+rfc8785>=0.1.4
+typing-extensions>=4.16
+pytest==8.4.1
+ruff==0.12.9
+hatchling==1.27.0

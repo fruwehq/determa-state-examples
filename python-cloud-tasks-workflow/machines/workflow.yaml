@@ -1,0 +1,46 @@
+format: 1
+namespace: examples.cloud_tasks
+events:
+  enqueue:
+    direction: input
+    payload:
+      callback_url: {type: string, required: true}
+      body: {type: string, required: true}
+  task_requested:
+    direction: output
+    payload:
+      callback_url: {type: string, required: true}
+      body: {type: string, required: true}
+  task_created:
+    direction: input
+    correlates_to: task_requested
+    payload:
+      task_name: {type: string, required: true}
+machines:
+  - machine_id: task_workflow
+    version: 1
+    root:
+      type: composite
+      variables:
+        task_name: {type: string, init: ""}
+      initial: {transition_to: ready}
+      states:
+        ready:
+          on_events:
+            enqueue:
+              transition_to: submitting
+              action:
+                - send:
+                    event: task_requested
+                    to: {external: true}
+                    correlation_id: "'cloud-task'"
+                    payload:
+                      callback_url: event.payload.callback_url
+                      body: event.payload.body
+        submitting:
+          on_events:
+            task_created:
+              transition_to: submitted
+              action:
+                - assign: {task_name: event.payload.task_name}
+        submitted: {}
