@@ -57,6 +57,8 @@ class CloudTasksHandler:
 
 class Workflow:
     def __init__(self, path: Path, handlers: dict[str, CloudTasksHandler]) -> None:
+        if "cloud-tasks.v1" not in handlers:
+            raise ValueError("cloud-tasks.v1 handler must be installed before creating work")
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self.handlers = handlers
@@ -86,6 +88,8 @@ class Workflow:
                 self.verify_binding(connection, name)
 
     def verify_binding(self, connection: sqlite3.Connection, name: str) -> None:
+        if name not in self.handlers:
+            raise ValueError("required handler is not installed")
         row = connection.execute(
             "SELECT queue FROM handler_bindings WHERE handler=?", (name,)
         ).fetchone()
@@ -101,6 +105,7 @@ class Workflow:
     def enqueue(self, identity: str, callback_url: str, body: str) -> None:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            self.verify_binding(connection, "cloud-tasks.v1")
             if connection.execute("SELECT 1 FROM workflows WHERE id=?", (identity,)).fetchone():
                 raise ValueError("workflow already exists; inspect or resume it")
             created = ds.create(

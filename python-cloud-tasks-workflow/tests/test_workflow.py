@@ -101,3 +101,16 @@ def test_restart_and_mutated_registry_cannot_retarget_pending_effect(tmp_path):
     with pytest.raises(ValueError, match="immutable binding"):
         workflow.drain()
     client.create_task.assert_not_called()
+
+
+def test_handler_must_be_bound_before_committing_any_work(tmp_path):
+    with pytest.raises(ValueError, match="before creating work"):
+        Workflow(tmp_path / "unbound.sqlite3", {})
+    assert not (tmp_path / "unbound.sqlite3").exists()
+    _, _, workflow = setup(tmp_path)
+    workflow.handlers.clear()
+    with pytest.raises(ValueError, match="not installed"):
+        workflow.enqueue("unbound", "https://example.com/dispatch", "{}")
+    with sqlite3.connect(workflow.path) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM workflows").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM effects").fetchone()[0] == 0
