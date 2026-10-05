@@ -1,0 +1,9 @@
+services:
+  host:
+    build: .
+    ports: ["127.0.0.1:8089:8089"]
+    environment:
+      DOCUMENT_TOKEN: "${DOCUMENT_TOKEN:?set a local deployment token}"
+    volumes: ["documents:/data"]
+volumes:
+  documents: {}

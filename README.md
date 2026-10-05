@@ -8,6 +8,10 @@ of [Determa State](https://github.com/fruwehq/determa-state-spec).
 - [Embedded Python Cloud Tasks workflow](python-cloud-tasks-workflow/) - an unreleased
   0.3.0 workflow with committed intents, real SDK/protobuf objects inside a native
   handler, declared results, immutable destinations and offline transport tests.
+- [Customer-native document worker](python-remote-document-worker/) - remote public
+  v1 machine execution with customer-owned native archives, durable local outcomes
+  and correlated result events.
+
 - [Docker-hosted expense approval](python-docker-expense-service/) - a public v1
   HTTP client/SQLite host workflow with durable command phases, authenticated
   routing, exact receipt retry and independent client/host persistence.
