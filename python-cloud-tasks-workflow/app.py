@@ -81,6 +81,12 @@ class Workflow:
                 "BEGIN SELECT RAISE(ABORT, 'immutable handler binding'); END;"
             )
 
+            unbound = connection.execute(
+                "SELECT 1 FROM effects e WHERE NOT EXISTS "
+                "(SELECT 1 FROM handler_bindings b WHERE b.handler=e.handler) LIMIT 1"
+            ).fetchone()
+            if unbound is not None:
+                raise ValueError("existing unbound intent cannot be assigned a destination")
             for name, handler in handlers.items():
                 connection.execute(
                     "INSERT OR IGNORE INTO handler_bindings VALUES (?,?)", (name, handler.queue)
