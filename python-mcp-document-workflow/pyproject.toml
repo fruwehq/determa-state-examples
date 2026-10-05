@@ -1,5 +1,5 @@
 [project]
-name = "determa-docker-document-service-example"
+name = "determa-mcp-document-workflow-example"
 version = "0.3.0"
 requires-python = ">=3.11,<3.14"
 dependencies = ["determa-state @ git+https://github.com/fruwehq/determa-state-python.git@61fd77ed2e73365e80739d6d99c50c54fc6f0da6"]
