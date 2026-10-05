@@ -133,7 +133,7 @@
       }
     ]
   },
-  "migration_descriptor_digest": "sha256:fb4707a5378a17fbabdb4b896342aa60cd59c76e12de799fe07eac67b283ff4b",
+  "migration_descriptor_digest": "sha256:7800f88fe421980fd4cbba13f188a0364aade13813765e4a035320c3aa693ba2",
   "migration_descriptor_format": "determa.aggregate_migration",
   "migration_descriptor_schema_version": 1,
   "mode": "transform",
@@ -152,5 +152,7 @@
   "terminal_policy": {
     "completed": "preserve",
     "faulted": "preserve"
-  }
+  },
+  "queued_event_default": "preserve_if_compatible",
+  "queued_event_rules": []
 }

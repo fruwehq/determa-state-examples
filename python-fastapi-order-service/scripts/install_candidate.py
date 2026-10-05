@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
+import tomllib
+from pathlib import Path
 
 
 def run(*arguments: str) -> str:
@@ -16,9 +17,11 @@ def run(*arguments: str) -> str:
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     pin = json.loads((root / "source-lock.json").read_text())
-    if pin["format"] != 1 or pin["repository"] != (
-        "https://github.com/fruwehq/determa-state-python.git"
-    ) or not re.fullmatch(r"[0-9a-f]{40}", pin["commit"]):
+    if (
+        pin["format"] != 1
+        or pin["repository"] != ("https://github.com/fruwehq/determa-state-python.git")
+        or not re.fullmatch(r"[0-9a-f]{40}", pin["commit"])
+    ):
         raise SystemExit("invalid public candidate source pin")
     source = root / ".candidate-source"
     if not source.exists():
@@ -31,12 +34,19 @@ def main() -> None:
     subprocess.check_call(["git", "-C", str(source), "checkout", "--detach", pin["commit"]])
     if run("git", "-C", str(source), "rev-parse", "HEAD") != pin["commit"]:
         raise SystemExit("candidate checkout does not match the exact public pin")
-    metadata = (source / "pyproject.toml").read_text()
-    if f'version = "{pin["state_version"]}"' not in metadata:
+    metadata = tomllib.loads((source / "pyproject.toml").read_text())
+    if metadata["tool"]["hatch"]["version"]["path"] != "src/determa/state/__about__.py":
+        raise SystemExit("candidate package version source differs from the reviewed contract")
+    version = re.search(
+        r'^__version__\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"',
+        (source / "src/determa/state/__about__.py").read_text(),
+        re.MULTILINE,
+    )
+    if version is None or version.group(1) != pin["state_version"]:
         raise SystemExit("candidate package version differs from the source lock")
-    subprocess.check_call([
-        sys.executable, "-m", "pip", "install", "--no-build-isolation", "--no-deps", str(source)
-    ])
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "--no-build-isolation", "--no-deps", str(source)]
+    )
 
 
 if __name__ == "__main__":

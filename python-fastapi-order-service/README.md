@@ -1,7 +1,7 @@
 # Python FastAPI order service
 
-A complete order workflow application that embeds the released
-`determa-state==0.2.0` Python library directly. It exposes an HTTP API, stores portable
+A complete order workflow application that embeds the unreleased
+Determa State 0.3.0 Python candidate through an exact public Git commit. It exposes an HTTP API, stores portable
 Determa aggregates in SQLite, and treats payment and fulfillment calls as durable
 host-managed effects.
 
@@ -36,7 +36,7 @@ HTTP command
    v
 FastAPI -> BEGIN IMMEDIATE
              |-- inbox idempotency record
-             |-- restore/migrate/dispatch Determa aggregate
+             |-- restore/migrate/admit/step version-1 aggregate
              |-- business order projection
              |-- canonical aggregate bytes
              |-- ordered outbox intents
@@ -66,7 +66,7 @@ durable inspection. Their lack of handlers makes later workflow events invalid.
 
 ## Prerequisites
 
-- Python 3.11 through 3.14
+- Python 3.11 through 3.13; Git
 - `make`
 - optional: Docker with Compose
 
@@ -82,7 +82,8 @@ From this folder:
 make start
 ```
 
-This creates `.venv`, installs only the hashed lockfile, installs this application
+This creates `.venv`, installs hashed third-party dependencies, verifies and installs
+the public engine commit in `source-lock.json`, installs this application
 without resolving other packages, initializes `var/orders.sqlite3`, and serves
 `http://127.0.0.1:8000`. Interactive OpenAPI documentation is available at
 `http://127.0.0.1:8000/docs`.
@@ -270,8 +271,8 @@ To reproduce a deployment upgrade without rewriting every row:
 3. Stop the process.
 4. Restart with `ORDER_DEFINITION_VERSION=2 ORDER_DATABASE=var/migration.sqlite3 make run`.
 5. Read the order: reads remain on trusted version 1 and do not rewrite it.
-6. Submit its next valid command. `migrate_and_dispatch` applies the trusted migration
-   and the command in the same transaction.
+6. Submit its next valid command. `migrate_aggregate_v1`, `admit`, and `step` apply the trusted migration
+   and the command in the same application transaction.
 
 The maintenance endpoint can migrate without dispatching an event:
 
@@ -279,7 +280,7 @@ The maintenance endpoint can migrate without dispatching an event:
 curl -sS -X POST "http://127.0.0.1:8000/admin/orders/$ORDER_ID/migrate"
 ```
 
-This uses `migrate_aggregate(..., maintenance_mode=True)`, persists the audit record,
+This uses `migrate_aggregate_v1(..., maintenance_mode=True)`, persists the audit record,
 and is a no-op after the row reaches the configured version. A missing state mapping,
 untrusted definition, invalid descriptor, or failed migration aborts the transaction.
 The service never interprets old aggregate bytes with the new YAML directly.
@@ -361,3 +362,8 @@ published definition in place.
 - Exactly-once behavior is not claimed across SQLite and remote systems.
 - The example keeps two trusted definitions locally. A production service would
   normally use an immutable artifact registry and explicit trust policy.
+
+The candidate installer verifies the allowlisted public repository, exact commit,
+clean checkout, and engine version. No 0.3.0 release or tag is assumed. Use a fresh
+disposable database when upgrading this example from 0.2.0. Machine definitions
+retain numeric `format: 1`; persistence uses version-1 artifacts.

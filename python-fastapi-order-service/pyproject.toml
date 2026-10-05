@@ -29,6 +29,9 @@ order-service = "order_service.__main__:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/order_service"]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel.force-include]
 "machines" = "order_service/machines"
 "migrations" = "order_service/migrations"

@@ -25,6 +25,7 @@ def parse_args() -> argparse.Namespace:
         "--released-version",
         help="Use this release instead of querying GitHub (for deterministic local checks).",
     )
+    parser.add_argument("--candidate-version", choices=["0.3.0"], help="Verify exact public source pins for the approved unreleased candidate.")
     return parser.parse_args()
 
 
@@ -129,13 +130,48 @@ def node_pins(example: Path) -> list[tuple[Path, str]]:
     return versions
 
 
+def candidate_pins(example: Path, version: str) -> list[tuple[Path, str]]:
+    lock_path = example / "source-lock.json"
+    lock = json.loads(lock_path.read_text())
+    if lock.get("format") != 1 or lock.get("state_version") != version:
+        raise ValueError(f"{lock_path}: invalid candidate version or format")
+    repository, commit = lock.get("repository"), lock.get("commit")
+    if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError(f"{lock_path}: exact commit required")
+    pyproject = example / "pyproject.toml"
+    if pyproject.is_file():
+        if repository != "https://github.com/fruwehq/determa-state-python.git":
+            raise ValueError(f"{lock_path}: public Python repository required")
+        dependencies = tomllib.loads(pyproject.read_text())["project"]["dependencies"]
+        expected = f"determa-state @ git+{repository}@{commit}"
+        if [d for d in dependencies if d.startswith("determa-state")] != [expected]:
+            raise ValueError(f"{pyproject}: candidate source pin mismatch")
+        return [(pyproject, version)]
+    manifest = example / "Cargo.toml"
+    if manifest.is_file():
+        if repository != "https://github.com/fruwehq/determa-state-rust":
+            raise ValueError(f"{lock_path}: public Rust repository required")
+        dependency = tomllib.loads(manifest.read_text())["dependencies"]["determa-state"]
+        if (dependency.get("git"), dependency.get("rev"), dependency.get("version")) != (repository, commit, "=" + version):
+            raise ValueError(f"{manifest}: candidate source pin mismatch")
+        packages = tomllib.loads((example / "Cargo.lock").read_text())["package"]
+        state = [p for p in packages if p["name"] == "determa-state"]
+        expected = f"git+{repository}?rev={commit}#{commit}"
+        if len(state) != 1 or state[0].get("source") != expected or state[0]["version"] != version:
+            raise ValueError(f"{manifest}: candidate lockfile mismatch")
+        return [(manifest, version)]
+    raise ValueError(f"{example}: no candidate dependency manifest")
+
+
 def main() -> int:
     args = parse_args()
-    released = args.released_version or latest_released_version()
+    if args.candidate_version and args.released_version:
+        raise ValueError("choose candidate or released validation")
+    released = args.candidate_version or args.released_version or latest_released_version()
     failures: list[str] = []
     examples = catalog_paths()
     for example in examples:
-        pins = python_pins(example) + cargo_pins(example) + node_pins(example)
+        pins = candidate_pins(example, released) if args.candidate_version else python_pins(example) + cargo_pins(example) + node_pins(example)
         if not pins:
             failures.append(f"{example.name}: no exact Determa State dependency pin found")
             continue
@@ -153,7 +189,7 @@ def main() -> int:
         for failure in failures:
             print(f"- {failure}", file=sys.stderr)
         return 1
-    print(f"All {len(examples)} catalogued examples match released State {released}.")
+    print(f"All {len(examples)} catalogued examples match {"unreleased candidate" if args.candidate_version else "released"} State {released}.")
     return 0
 
 

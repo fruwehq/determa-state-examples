@@ -94,9 +94,7 @@ class OrderService:
                 ),
             )
             self._store_emissions(connection, order_id, created["emissions"])
-            self._record_inbox(
-                connection, event_id, order_id, "create_order", payload, view
-            )
+            self._record_inbox(connection, event_id, order_id, "create_order", payload, view)
             return CommandResult(view, False, False)
 
     def apply_event(
@@ -147,13 +145,20 @@ class OrderService:
                 migration_applied = False
             admitted = ds.admit(
                 candidate,
-                [{"delivery_mode": "input", "envelope": envelope,
-                  "envelope_digest": ds.delivery_request_digest(order_id, "input", envelope)}],
+                [
+                    {
+                        "delivery_mode": "input",
+                        "envelope": envelope,
+                        "envelope_digest": ds.delivery_request_digest(order_id, "input", envelope),
+                    }
+                ],
                 self.definitions.resolver,
             )
             if admitted["result"] == "rejected":
                 raise CommandRejectedError(f"admission failed: {admitted['rejection']}")
-            core = ds.step(admitted["state"], candidate["root_runtime_id"], self.definitions.resolver)
+            core = ds.step(
+                admitted["state"], candidate["root_runtime_id"], self.definitions.resolver
+            )
             aggregate = canonical_bytes(core["state"])
             emissions = core["emissions"]
             disposition = core["disposition"]
@@ -199,9 +204,7 @@ class OrderService:
                         self._json(audit),
                     ),
                 )
-            self._record_inbox(
-                connection, event_id, order_id, event_name, payload, view
-            )
+            self._record_inbox(connection, event_id, order_id, event_name, payload, view)
             return CommandResult(view, False, migration_applied)
 
     def migrate_order(self, order_id: str) -> CommandResult:
@@ -361,9 +364,7 @@ class OrderService:
     def _order_row(self, connection: sqlite3.Connection, order_id: str) -> sqlite3.Row:
         row = cast(
             sqlite3.Row | None,
-            connection.execute(
-                "SELECT * FROM orders WHERE order_id = ?", (order_id,)
-            ).fetchone(),
+            connection.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone(),
         )
         if row is None:
             raise OrderNotFoundError(order_id)
@@ -377,9 +378,7 @@ class OrderService:
         event_name: str,
         payload: dict[str, Any],
     ) -> dict[str, Any] | None:
-        row = connection.execute(
-            "SELECT * FROM inbox WHERE event_id = ?", (event_id,)
-        ).fetchone()
+        row = connection.execute("SELECT * FROM inbox WHERE event_id = ?", (event_id,)).fetchone()
         if row is None:
             return None
         if (
