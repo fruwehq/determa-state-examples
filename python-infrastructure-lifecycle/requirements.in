@@ -1,0 +1,8 @@
+# State is installed from exact public source-lock.json, never a nonexistent release.
+cel-python==0.5.0
+jsonschema==4.26.0
+PyYAML==6.0.3
+rfc8785==0.1.4
+typing-extensions==4.16.0
+hatchling==1.27.0
+ruff==0.12.9

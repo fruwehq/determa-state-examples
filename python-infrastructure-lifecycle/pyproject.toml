@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "determa-infrastructure-lifecycle-example"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "Unfinished unreleased Determa State 0.3.0 infrastructure lifecycle application"
+dependencies = ["determa-state==0.3.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/infrastructure_lifecycle"]

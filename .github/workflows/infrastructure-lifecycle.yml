@@ -1,0 +1,29 @@
+name: Infrastructure lifecycle application
+on:
+  pull_request:
+    paths:
+      - 'python-infrastructure-lifecycle/**'
+      - '.github/workflows/infrastructure-lifecycle.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'python-infrastructure-lifecycle/**'
+      - '.github/workflows/infrastructure-lifecycle.yml'
+permissions:
+  contents: read
+jobs:
+  application-checkpoint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.13']
+    defaults:
+      run:
+        working-directory: python-infrastructure-lifecycle
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python }}'
+      - run: make setup
+      - run: make test

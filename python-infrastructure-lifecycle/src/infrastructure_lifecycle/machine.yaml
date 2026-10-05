@@ -1,0 +1,203 @@
+format: 1
+namespace: examples.infrastructure_lifecycle
+events:
+  set_desired:
+    direction: input
+    payload:
+      present:
+        type: bool
+        required: true
+      size:
+        type: string
+        required: true
+  reconcile:
+    direction: input
+    payload:
+      operation_token:
+        type: string
+        required: true
+  resource_requested:
+    direction: output
+    payload:
+      resource_id:
+        type: string
+        required: true
+      expected_revision:
+        type: string
+        required: true
+      present:
+        type: bool
+        required: true
+      size:
+        type: string
+        required: true
+      operation_token:
+        type: string
+        required: true
+  resource_applied:
+    direction: input
+    payload:
+      operation_token:
+        type: string
+        required: true
+      revision:
+        type: string
+        required: true
+      present:
+        type: bool
+        required: true
+      size:
+        type: string
+        required: true
+  resource_rejected:
+    direction: input
+    payload:
+      operation_token:
+        type: string
+        required: true
+  resource_unknown:
+    direction: input
+    payload:
+      operation_token:
+        type: string
+        required: true
+machines:
+- machine_id: server
+  version: 1
+  root:
+    type: composite
+    variables:
+      desired_present:
+        type: bool
+        init: false
+      desired_size:
+        type: string
+        init: small
+      observed_known:
+        type: bool
+        init: false
+      observed_present:
+        type: bool
+        init: false
+      observed_size:
+        type: string
+        init: small
+      observed_revision:
+        type: string
+        init: ''
+      operation_token:
+        type: string
+        init: ''
+      pending:
+        type: bool
+        init: false
+      requested_present:
+        type: bool
+        init: false
+      requested_size:
+        type: string
+        init: small
+      used_operation_tokens:
+        type: list
+        init: []
+      expected_result_revision:
+        type: string
+        init: ''
+      observed_revision_number:
+        type: int
+        init: -1
+    initial:
+      transition_to: stable
+    on_events:
+      set_desired:
+        action:
+        - assign:
+            desired_present: event.payload.present
+        - assign:
+            desired_size: event.payload.size
+    states:
+      stable:
+        on_events:
+          reconcile:
+            guard: event.payload.operation_token != '' && !(event.payload.operation_token in used_operation_tokens)
+              && (!observed_known || desired_present != observed_present || desired_size != observed_size)
+            transition_to: applying
+            action:
+            - assign:
+                operation_token: event.payload.operation_token
+            - assign:
+                used_operation_tokens: used_operation_tokens + [event.payload.operation_token]
+            - assign:
+                expected_result_revision: string(observed_revision_number + 1)
+            - assign:
+                pending: 'true'
+            - assign:
+                requested_present: desired_present
+            - assign:
+                requested_size: desired_size
+            - send:
+                event: resource_requested
+                to:
+                  external: true
+                correlation_id: operation_token
+                payload:
+                  resource_id: '''server-1'''
+                  expected_revision: observed_revision
+                  present: requested_present
+                  size: requested_size
+                  operation_token: operation_token
+      applying:
+        on_events:
+          resource_applied:
+            guard: pending && event.payload.operation_token == operation_token && event.payload.present == requested_present
+              && event.payload.size == requested_size && event.payload.revision == expected_result_revision
+            transition_to: stable
+            action:
+            - assign:
+                observed_known: 'true'
+            - assign:
+                observed_present: event.payload.present
+            - assign:
+                observed_size: event.payload.size
+            - assign:
+                observed_revision: event.payload.revision
+            - assign:
+                observed_revision_number: observed_revision_number + 1
+            - assign:
+                pending: 'false'
+          resource_rejected:
+            guard: pending && event.payload.operation_token == operation_token
+            transition_to: stable
+            action:
+            - assign:
+                pending: 'false'
+          resource_unknown:
+            guard: pending && event.payload.operation_token == operation_token
+            transition_to: uncertain
+      uncertain:
+        on_events:
+          resource_applied:
+            guard: pending && event.payload.operation_token == operation_token && event.payload.present == requested_present
+              && event.payload.size == requested_size && event.payload.revision == expected_result_revision
+            transition_to: stable
+            action:
+            - assign:
+                observed_known: 'true'
+            - assign:
+                observed_present: event.payload.present
+            - assign:
+                observed_size: event.payload.size
+            - assign:
+                observed_revision: event.payload.revision
+            - assign:
+                observed_revision_number: observed_revision_number + 1
+            - assign:
+                pending: 'false'
+          resource_rejected:
+            guard: pending && event.payload.operation_token == operation_token
+            transition_to: stable
+            action:
+            - assign:
+                pending: 'false'
+          resource_unknown:
+            guard: pending && event.payload.operation_token == operation_token
