@@ -58,7 +58,8 @@ The remote outbox stays retained intent evidence; local reported rows prevent
 rebuilding on repeated polls without inventing an unsupported acknowledgement.
 
 For debugging use `make inspect`, inspect the local connector `outcomes` table,
-and export an archive with `worker.py export EFFECT_ID --output var/document.zip`.
+and export an archive with `.venv/bin/python worker.py export EFFECT_ID --database var/connector.sqlite3
+--output var/document.zip`.
 Restart using the same data directory and endpoint. Stop the MCP consumer and
 host before `make reset`; reset deletes disposable local journals and Docker data.
 Keep retained results and request journals together in production. Regenerate the

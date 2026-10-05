@@ -16,6 +16,9 @@ async def main():
     async with stdio_client(parameters) as (reader, writer):
         async with ClientSession(reader, writer) as session:
             await session.initialize()
+            tools = await session.list_tools()
+            if len(tools.tools) != 4:
+                raise RuntimeError("expected all four workflow tools")
             steps = [
                 ("create_document", {"document_id": "mcp-document-42"}),
                 ("request_document", {"document_id": "mcp-document-42",
